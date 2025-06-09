@@ -1,0 +1,310 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import {Test, console} from "forge-std/Test.sol";
+import {Betcaster} from "../src/betcaster.sol";
+import {ERC20Mock} from "lib/openzeppelin-contracts/contracts/mocks/token/ERC20Mock.sol";
+
+contract BetcasterTest is Test {
+    Betcaster public betcaster;
+    ERC20Mock public mockToken;
+
+    // Test addresses
+    address public maker = makeAddr("maker");
+    address public taker = makeAddr("taker");
+    address public arbiter = makeAddr("arbiter");
+    address public user1 = makeAddr("user1");
+    address public user2 = makeAddr("user2");
+
+    // Test constants
+    uint256 public constant PROTOCOL_FEE = 100; // 1%
+    uint256 public constant BET_AMOUNT = 1000e18;
+    uint256 public constant ARBITER_FEE = 50; // 0.5%
+    uint256 public constant INITIAL_TOKEN_SUPPLY = 1000000e18;
+    string public constant BET_AGREEMENT = "Team A will win the match";
+
+    // Events for testing
+    event BetCreated(uint256 indexed betNumber, Betcaster.Bet indexed bet);
+
+    function setUp() public {
+        // Deploy contracts
+        betcaster = new Betcaster(PROTOCOL_FEE);
+        mockToken = new ERC20Mock();
+
+        // Mint tokens to test addresses
+        mockToken.mint(maker, INITIAL_TOKEN_SUPPLY);
+        mockToken.mint(taker, INITIAL_TOKEN_SUPPLY);
+        mockToken.mint(user1, INITIAL_TOKEN_SUPPLY);
+        mockToken.mint(user2, INITIAL_TOKEN_SUPPLY);
+
+        // Approve betcaster contract to spend tokens
+        vm.prank(maker);
+        mockToken.approve(address(betcaster), type(uint256).max);
+
+        vm.prank(taker);
+        mockToken.approve(address(betcaster), type(uint256).max);
+
+        vm.prank(user1);
+        mockToken.approve(address(betcaster), type(uint256).max);
+
+        vm.prank(user2);
+        mockToken.approve(address(betcaster), type(uint256).max);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            CONSTRUCTOR TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testConstructorSetsProtocolFee() public view {
+        assertEq(betcaster.s_prtocolFee(), PROTOCOL_FEE);
+    }
+
+    function testConstructorInitializesBetNumberToZero() public view {
+        assertEq(betcaster.getCurrentBetNumber(), 0);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            CREATE BET TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testCreateBetSuccess() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        vm.expectEmit(true, true, false, false);
+        emit BetCreated(
+            1,
+            Betcaster.Bet({
+                maker: maker,
+                taker: taker,
+                arbiter: arbiter,
+                betTokenAddress: address(mockToken),
+                betAmount: BET_AMOUNT,
+                timestamp: block.timestamp,
+                endTime: endTime,
+                status: Betcaster.Status.WAITING_FOR_TAKER,
+                arbiterFee: ARBITER_FEE,
+                betAgreement: BET_AGREEMENT
+            })
+        );
+
+        vm.prank(maker);
+        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+
+        // Verify bet was created correctly
+        Betcaster.Bet memory createdBet = betcaster.getBet(1);
+        assertEq(createdBet.maker, maker);
+        assertEq(createdBet.taker, taker);
+        assertEq(createdBet.arbiter, arbiter);
+        assertEq(createdBet.betTokenAddress, address(mockToken));
+        assertEq(createdBet.betAmount, BET_AMOUNT);
+        assertEq(createdBet.timestamp, block.timestamp);
+        assertEq(createdBet.endTime, endTime);
+        assertEq(uint256(createdBet.status), uint256(Betcaster.Status.WAITING_FOR_TAKER));
+        assertEq(createdBet.arbiterFee, ARBITER_FEE);
+        assertEq(createdBet.betAgreement, BET_AGREEMENT);
+
+        // Verify bet number incremented
+        assertEq(betcaster.getCurrentBetNumber(), 1);
+
+        // Verify tokens were transferred
+        assertEq(mockToken.balanceOf(address(betcaster)), BET_AMOUNT);
+        assertEq(mockToken.balanceOf(maker), INITIAL_TOKEN_SUPPLY - BET_AMOUNT);
+    }
+
+    function testCreateBetRevertsWithZeroBetAmount() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        vm.prank(maker);
+        vm.expectRevert(Betcaster.Betcaster__BetAmountMustBeGreaterThanZero.selector);
+        betcaster.createBet(
+            taker,
+            arbiter,
+            address(mockToken),
+            0, // Zero bet amount
+            endTime,
+            ARBITER_FEE,
+            BET_AGREEMENT
+        );
+    }
+
+    function testCreateBetRevertsWithPastEndTime() public {
+        // Advance Anvil node time by 90 minutes
+        vm.warp(block.timestamp + 90 minutes);
+        uint256 pastEndTime = block.timestamp - 1 hours;
+
+        vm.prank(maker);
+        vm.expectRevert(Betcaster.Betcaster__EndTimeMustBeInTheFuture.selector);
+        betcaster.createBet(
+            taker,
+            arbiter,
+            address(mockToken),
+            BET_AMOUNT,
+            pastEndTime, // Past end time
+            ARBITER_FEE,
+            BET_AGREEMENT
+        );
+    }
+
+    function testCreateBetRevertsWithCurrentTimestamp() public {
+        vm.prank(maker);
+        vm.expectRevert(Betcaster.Betcaster__EndTimeMustBeInTheFuture.selector);
+        betcaster.createBet(
+            taker,
+            arbiter,
+            address(mockToken),
+            BET_AMOUNT,
+            block.timestamp, // Current timestamp
+            ARBITER_FEE,
+            BET_AGREEMENT
+        );
+    }
+
+    function testCreateBetRevertsWithInsufficientTokenBalance() public {
+        uint256 endTime = block.timestamp + 1 days;
+        address poorUser = makeAddr("poorUser");
+
+        vm.prank(poorUser);
+        vm.expectRevert(); // ERC20 transfer will revert
+        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+    }
+
+    function testCreateBetRevertsWithInsufficientAllowance() public {
+        uint256 endTime = block.timestamp + 1 days;
+        address userWithoutApproval = makeAddr("userWithoutApproval");
+        mockToken.mint(userWithoutApproval, INITIAL_TOKEN_SUPPLY);
+
+        vm.prank(userWithoutApproval);
+        vm.expectRevert(); // ERC20 transferFrom will revert due to insufficient allowance
+        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        MULTIPLE BETS TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testCreateMultipleBets() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create first bet
+        vm.prank(maker);
+        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, "First bet");
+
+        // Create second bet
+        vm.prank(user1);
+        betcaster.createBet(
+            user2, arbiter, address(mockToken), BET_AMOUNT / 2, endTime + 1 hours, ARBITER_FEE, "Second bet"
+        );
+
+        // Verify both bets exist
+        assertEq(betcaster.getCurrentBetNumber(), 2);
+
+        Betcaster.Bet memory firstBet = betcaster.getBet(1);
+        Betcaster.Bet memory secondBet = betcaster.getBet(2);
+
+        assertEq(firstBet.maker, maker);
+        assertEq(firstBet.betAmount, BET_AMOUNT);
+        assertEq(firstBet.betAgreement, "First bet");
+
+        assertEq(secondBet.maker, user1);
+        assertEq(secondBet.betAmount, BET_AMOUNT / 2);
+        assertEq(secondBet.betAgreement, "Second bet");
+
+        // Verify contract holds both bet amounts
+        assertEq(mockToken.balanceOf(address(betcaster)), BET_AMOUNT + (BET_AMOUNT / 2));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            VIEW FUNCTION TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testGetCurrentBetNumber() public {
+        assertEq(betcaster.getCurrentBetNumber(), 0);
+
+        uint256 endTime = block.timestamp + 1 days;
+        vm.prank(maker);
+        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+
+        assertEq(betcaster.getCurrentBetNumber(), 1);
+    }
+
+    function testGetBetReturnsCorrectData() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        vm.prank(maker);
+        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+
+        Betcaster.Bet memory retrievedBet = betcaster.getBet(1);
+
+        assertEq(retrievedBet.maker, maker);
+        assertEq(retrievedBet.taker, taker);
+        assertEq(retrievedBet.arbiter, arbiter);
+        assertEq(retrievedBet.betTokenAddress, address(mockToken));
+        assertEq(retrievedBet.betAmount, BET_AMOUNT);
+        assertEq(retrievedBet.endTime, endTime);
+        assertEq(uint256(retrievedBet.status), uint256(Betcaster.Status.WAITING_FOR_TAKER));
+        assertEq(retrievedBet.arbiterFee, ARBITER_FEE);
+        assertEq(retrievedBet.betAgreement, BET_AGREEMENT);
+    }
+
+    function testGetNonExistentBetReturnsEmptyStruct() public view {
+        Betcaster.Bet memory emptyBet = betcaster.getBet(999);
+
+        assertEq(emptyBet.maker, address(0));
+        assertEq(emptyBet.taker, address(0));
+        assertEq(emptyBet.arbiter, address(0));
+        assertEq(emptyBet.betTokenAddress, address(0));
+        assertEq(emptyBet.betAmount, 0);
+        assertEq(emptyBet.timestamp, 0);
+        assertEq(emptyBet.endTime, 0);
+        assertEq(uint256(emptyBet.status), 0);
+        assertEq(emptyBet.arbiterFee, 0);
+        assertEq(emptyBet.betAgreement, "");
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            FUZZ TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testFuzzCreateBetWithValidInputs(uint256 _betAmount, uint256 _arbiterFee, uint256 _timeOffset) public {
+        // Bound inputs to valid ranges
+        _betAmount = bound(_betAmount, 1, INITIAL_TOKEN_SUPPLY);
+        _arbiterFee = bound(_arbiterFee, 0, 10000); // 0-100%
+        _timeOffset = bound(_timeOffset, 1, 365 days);
+
+        uint256 endTime = block.timestamp + _timeOffset;
+
+        vm.prank(maker);
+        betcaster.createBet(taker, arbiter, address(mockToken), _betAmount, endTime, _arbiterFee, BET_AGREEMENT);
+
+        Betcaster.Bet memory createdBet = betcaster.getBet(1);
+        assertEq(createdBet.betAmount, _betAmount);
+        assertEq(createdBet.arbiterFee, _arbiterFee);
+        assertEq(createdBet.endTime, endTime);
+        assertEq(mockToken.balanceOf(address(betcaster)), _betAmount);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            INTEGRATION TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testFullBetCreationFlow() public {
+        uint256 initialMakerBalance = mockToken.balanceOf(maker);
+        uint256 initialContractBalance = mockToken.balanceOf(address(betcaster));
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet
+        vm.prank(maker);
+        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+
+        // Verify state changes
+        assertEq(betcaster.getCurrentBetNumber(), 1);
+        assertEq(mockToken.balanceOf(maker), initialMakerBalance - BET_AMOUNT);
+        assertEq(mockToken.balanceOf(address(betcaster)), initialContractBalance + BET_AMOUNT);
+
+        // Verify bet data
+        Betcaster.Bet memory bet = betcaster.getBet(1);
+        assertEq(bet.maker, maker);
+        assertEq(uint256(bet.status), uint256(Betcaster.Status.WAITING_FOR_TAKER));
+        assertTrue(bet.timestamp <= block.timestamp);
+    }
+}

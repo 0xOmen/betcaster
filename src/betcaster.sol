@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
-contract Betcaster {
+contract Betcaster is Ownable {
     error Betcaster__BetAmountMustBeGreaterThanZero();
     error Betcaster__EndTimeMustBeInTheFuture();
 
@@ -42,7 +42,7 @@ contract Betcaster {
 
     // Modifiers
     // Constructor
-    constructor(uint256 protocolFee) {
+    constructor(uint256 protocolFee) Ownable(msg.sender) {
         s_prtocolFee = protocolFee;
     }
 
