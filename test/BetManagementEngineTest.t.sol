@@ -8,7 +8,7 @@ import {ERC20Mock} from "lib/openzeppelin-contracts/contracts/mocks/token/ERC20M
 import {BetTypes} from "../src/BetTypes.sol";
 import {DeployBetcaster} from "../script/DeployBetcaster.s.sol";
 
-contract BetcasterTest is Test {
+contract BetManagementEngineTest is Test {
     Betcaster public betcaster;
     BetManagementEngine public betManagementEngine;
     ERC20Mock public mockToken;
@@ -35,11 +35,9 @@ contract BetcasterTest is Test {
     function setUp() public {
         // Deploy contracts
         DeployBetcaster deployer = new DeployBetcaster();
-        (address betcasterAddr, address betManagementEngineAddr, address mockTokenAddr) = deployer.run();
-
-        betcaster = Betcaster(betcasterAddr);
-        betManagementEngine = BetManagementEngine(betManagementEngineAddr);
-        mockToken = ERC20Mock(mockTokenAddr);
+        address wethTokenAddr;
+        (betcaster, betManagementEngine, wethTokenAddr) = deployer.run();
+        mockToken = new ERC20Mock();
 
         // Mint tokens to test addresses
         mockToken.mint(maker, INITIAL_TOKEN_SUPPLY);
@@ -71,12 +69,13 @@ contract BetcasterTest is Test {
             taker, arbiter, address(mockToken), BET_AMOUNT, block.timestamp + 1 days, ARBITER_FEE, BET_AGREEMENT
         );
 
+        BetTypes.Bet memory createdBet = betcaster.getBet(1);
         assertEq(betcaster.getCurrentBetNumber(), 1);
-        assertEq(betcaster.getBet(1).maker, maker);
-        assertEq(betcaster.getBet(1).taker, taker);
-        assertEq(betcaster.getBet(1).arbiter, arbiter);
-        assertEq(betcaster.getBet(1).betTokenAddress, address(mockToken));
-        assertEq(betcaster.getBet(1).betAmount, BET_AMOUNT);
+        assertEq(createdBet.maker, maker);
+        assertEq(createdBet.taker, taker);
+        assertEq(createdBet.arbiter, arbiter);
+        assertEq(createdBet.betTokenAddress, address(mockToken));
+        assertEq(createdBet.betAmount, BET_AMOUNT);
     }
 
     function testCreateBetRevertsWithZeroBetAmount() public {

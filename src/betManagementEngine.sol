@@ -33,10 +33,9 @@ contract BetManagementEngine is Ownable {
 
     /**
      * @notice Constructor for BetManagementEngine
-     * @param _owner The owner of this contract
      * @param _betcaster The address of the Betcaster contract
      */
-    constructor(address _owner, address _betcaster) Ownable(_owner) {
+    constructor(address _betcaster) Ownable(msg.sender) {
         i_betcaster = _betcaster;
     }
 

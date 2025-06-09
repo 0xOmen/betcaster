@@ -7,7 +7,9 @@ import {Betcaster} from "../src/betcaster.sol";
 import {BetManagementEngine} from "../src/betManagementEngine.sol";
 
 contract DeployBetcaster is Script {
-    function run() public returns (address, address, address) {
+    uint256 public constant PROTOCOL_FEE = 50; // 0.5%
+
+    function run() public returns (Betcaster, BetManagementEngine, address) {
         HelperConfig helperConfig = new HelperConfig();
         (address weth, uint256 deployerKey) = helperConfig.activeNetworkConfig();
 
@@ -16,11 +18,11 @@ contract DeployBetcaster is Script {
         } else {
             vm.startBroadcast(deployerKey);
         }
-        Betcaster betcaster = new Betcaster(100);
-        BetManagementEngine betManagementEngine = new BetManagementEngine(msg.sender, address(betcaster));
+        Betcaster betcaster = new Betcaster(PROTOCOL_FEE);
+        BetManagementEngine betManagementEngine = new BetManagementEngine(address(betcaster));
         betcaster.setBetManagementEngine(address(betManagementEngine));
         vm.stopBroadcast();
 
-        return (address(betcaster), address(betManagementEngine), address(weth));
+        return (betcaster, betManagementEngine, weth);
     }
 }
