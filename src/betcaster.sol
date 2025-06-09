@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {BetTypes} from "./BetTypes.sol";
 
 /**
  * @title Betcaster
@@ -16,8 +17,6 @@ import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
  * @dev This is the main contract that stores the state of every agreement.
  */
 contract Betcaster is Ownable {
-    error Betcaster__BetAmountMustBeGreaterThanZero();
-    error Betcaster__EndTimeMustBeInTheFuture();
     error Betcaster__NotMaker();
     error Betcaster__BetNotWaitingForTaker();
     error Betcaster__NotMakerOrTaker();
@@ -25,56 +24,24 @@ contract Betcaster is Ownable {
     error Betcaster__StillInCooldown();
     error Betcaster__NotTaker();
     error Betcaster__BetNotInProcess();
-    // Type declarations
-
-    /**
-     * @notice Status is the current state of the bet.
-     * @dev WAITING_FOR_TAKER - The bet is waiting for a taker to accept the bet.
-     * @dev WAITING_FOR_ARBITER - The bet is waiting for an arbiter to accept their role.
-     * @dev IN_PROCESS - All parties have agreed to the bet and are waiting for end time and arbitration.
-     * @dev AWAITING_ARBITRATION - The bet is awaiting arbitration.
-     * @dev MAKER_WINS - The maker has won the bet.
-     * @dev TAKER_WINS - The taker has won the bet.
-     * @dev COMPLETED_MAKER_WINS - The the maker has won and claimed their winnings.
-     * @dev COMPLETED_TAKER_WINS - The the taker has won and claimed their winnings.
-     * @dev CANCELLED - The bet has been cancelled by one or more parties.
-     */
-    enum Status {
-        WAITING_FOR_TAKER,
-        WAITING_FOR_ARBITER,
-        IN_PROCESS,
-        AWAITING_ARBITRATION,
-        MAKER_WINS,
-        TAKER_WINS,
-        COMPLETED_MAKER_WINS,
-        COMPLETED_TAKER_WINS,
-        CANCELLED
-    }
-
-    struct Bet {
-        address maker;
-        address taker;
-        address arbiter;
-        address betTokenAddress;
-        uint256 betAmount;
-        uint256 timestamp;
-        uint256 endTime;
-        Status status;
-        uint256 arbiterFee;
-        string betAgreement;
-    }
+    error Betcaster__NotBetManagementEngine();
 
     // State variables
     uint256 public s_prtocolFee;
     uint256 private s_betNumber;
-    mapping(uint256 => Bet) private s_allBets;
+    mapping(uint256 => BetTypes.Bet) private s_allBets;
+    address private s_betManagementEngine;
 
     // Events
-    event BetCreated(uint256 indexed betNumber, Bet indexed bet);
-    event BetCancelled(uint256 indexed betNumber, address indexed calledBy, Bet indexed bet);
-    event BetAccepted(uint256 indexed betNumber, Bet indexed bet);
+    event BetCancelled(uint256 indexed betNumber, address indexed calledBy, BetTypes.Bet indexed bet);
+    event BetAccepted(uint256 indexed betNumber, BetTypes.Bet indexed bet);
 
     // Modifiers
+    modifier onlyBetManagementEngine() {
+        if (msg.sender != s_betManagementEngine) revert Betcaster__NotBetManagementEngine();
+        _;
+    }
+
     // Constructor
     /**
      * @notice constructor is called at contract creation.
@@ -86,49 +53,34 @@ contract Betcaster is Ownable {
     }
 
     // external functions
+
     // public functions
+    function setBetManagementEngine(address _betManagementEngine) public onlyOwner {
+        s_betManagementEngine = _betManagementEngine;
+    }
 
-    function createBet(
-        address _taker,
-        address _arbiter,
-        address _betTokenAddress,
-        uint256 _betAmount,
-        uint256 _endTime,
-        uint256 _arbiterFee,
-        string memory _betAgreement
-    ) public {
-        if (_betAmount <= 0) revert Betcaster__BetAmountMustBeGreaterThanZero();
-        if (_endTime <= block.timestamp) revert Betcaster__EndTimeMustBeInTheFuture();
-
+    function increaseBetNumber() public onlyBetManagementEngine returns (uint256) {
         s_betNumber++;
+        return s_betNumber;
+    }
 
-        Bet memory newBet = Bet({
-            maker: msg.sender,
-            taker: _taker,
-            arbiter: _arbiter,
-            betTokenAddress: _betTokenAddress,
-            betAmount: _betAmount,
-            timestamp: block.timestamp,
-            endTime: _endTime,
-            status: Status.WAITING_FOR_TAKER,
-            arbiterFee: _arbiterFee,
-            betAgreement: _betAgreement
-        });
+    function createBet(uint256 _betNumber, BetTypes.Bet memory _bet) public onlyBetManagementEngine {
+        s_allBets[_betNumber] = _bet;
+    }
 
-        s_allBets[s_betNumber] = newBet;
-
-        emit BetCreated(s_betNumber, newBet);
-
-        // transfer betAmount from maker to betTokenAddress
-        ERC20(_betTokenAddress).transferFrom(msg.sender, address(this), _betAmount);
+    function transferBetAmount(address _maker, address _betTokenAddress, uint256 _betAmount)
+        public
+        onlyBetManagementEngine
+    {
+        ERC20(_betTokenAddress).transferFrom(_maker, address(this), _betAmount);
     }
 
     function makerCancelBet(uint256 _betNumber) public {
-        Bet memory bet = s_allBets[_betNumber];
+        BetTypes.Bet memory bet = s_allBets[_betNumber];
         if (bet.maker != msg.sender) revert Betcaster__NotMaker();
-        if (bet.status != Status.WAITING_FOR_TAKER) revert Betcaster__BetNotWaitingForTaker();
-        bet.status = Status.CANCELLED;
-        s_allBets[_betNumber].status = Status.CANCELLED;
+        if (bet.status != BetTypes.Status.WAITING_FOR_TAKER) revert Betcaster__BetNotWaitingForTaker();
+        bet.status = BetTypes.Status.CANCELLED;
+        s_allBets[_betNumber].status = BetTypes.Status.CANCELLED;
 
         emit BetCancelled(_betNumber, msg.sender, bet);
 
@@ -136,14 +88,14 @@ contract Betcaster is Ownable {
     }
 
     function acceptBet(uint256 _betNumber) public {
-        Bet memory bet = s_allBets[_betNumber];
-        if (bet.status != Status.WAITING_FOR_TAKER) revert Betcaster__BetNotWaitingForTaker();
+        BetTypes.Bet memory bet = s_allBets[_betNumber];
+        if (bet.status != BetTypes.Status.WAITING_FOR_TAKER) revert Betcaster__BetNotWaitingForTaker();
         if (bet.taker == address(0)) {
             bet.taker = msg.sender;
             s_allBets[_betNumber].taker = msg.sender;
         }
         if (bet.taker != msg.sender) revert Betcaster__NotTaker();
-        s_allBets[_betNumber].status = Status.WAITING_FOR_ARBITER;
+        s_allBets[_betNumber].status = BetTypes.Status.WAITING_FOR_ARBITER;
 
         emit BetAccepted(_betNumber, bet);
 
@@ -151,12 +103,12 @@ contract Betcaster is Ownable {
     }
 
     function noArbiterCancelBet(uint256 _betNumber) public {
-        Bet memory bet = s_allBets[_betNumber];
+        BetTypes.Bet memory bet = s_allBets[_betNumber];
         if (bet.maker != msg.sender && bet.taker != msg.sender) revert Betcaster__NotMakerOrTaker();
-        if (bet.status != Status.WAITING_FOR_ARBITER) revert Betcaster__BetNotWaitingForArbiter();
+        if (bet.status != BetTypes.Status.WAITING_FOR_ARBITER) revert Betcaster__BetNotWaitingForArbiter();
         if (block.timestamp < bet.timestamp + 1 hours) revert Betcaster__StillInCooldown();
-        bet.status = Status.CANCELLED;
-        s_allBets[_betNumber].status = Status.CANCELLED;
+        bet.status = BetTypes.Status.CANCELLED;
+        s_allBets[_betNumber].status = BetTypes.Status.CANCELLED;
 
         emit BetCancelled(_betNumber, msg.sender, bet);
 
@@ -172,7 +124,11 @@ contract Betcaster is Ownable {
         return s_betNumber;
     }
 
-    function getBet(uint256 _betNumber) public view returns (Bet memory) {
+    function getBet(uint256 _betNumber) public view returns (BetTypes.Bet memory) {
         return s_allBets[_betNumber];
+    }
+
+    function getBetManagementEngine() public view returns (address) {
+        return s_betManagementEngine;
     }
 }
