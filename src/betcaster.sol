@@ -4,6 +4,17 @@ pragma solidity ^0.8.20;
 import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
+/**
+ * @title Betcaster
+ * @author 0x-Omen.eth
+ *
+ * Betcaster is a Peer to Peer escrow protocol utilizing Trusted Arbiters to resolve outcomes.
+ * It is highly configurable to allow for a wide range of use cases.
+ * The Protocol takes a fee from each bet to cover protocol costs.
+ * Arbiters fees are set by the maker and are paid to the arbiter at the end of the bet.
+ *
+ * @dev This is the main contract that stores the state of every agreement.
+ */
 contract Betcaster is Ownable {
     error Betcaster__BetAmountMustBeGreaterThanZero();
     error Betcaster__EndTimeMustBeInTheFuture();
@@ -16,6 +27,18 @@ contract Betcaster is Ownable {
     error Betcaster__BetNotInProcess();
     // Type declarations
 
+    /**
+     * @notice Status is the current state of the bet.
+     * @dev WAITING_FOR_TAKER - The bet is waiting for a taker to accept the bet.
+     * @dev WAITING_FOR_ARBITER - The bet is waiting for an arbiter to accept their role.
+     * @dev IN_PROCESS - All parties have agreed to the bet and are waiting for end time and arbitration.
+     * @dev AWAITING_ARBITRATION - The bet is awaiting arbitration.
+     * @dev MAKER_WINS - The maker has won the bet.
+     * @dev TAKER_WINS - The taker has won the bet.
+     * @dev COMPLETED_MAKER_WINS - The the maker has won and claimed their winnings.
+     * @dev COMPLETED_TAKER_WINS - The the taker has won and claimed their winnings.
+     * @dev CANCELLED - The bet has been cancelled by one or more parties.
+     */
     enum Status {
         WAITING_FOR_TAKER,
         WAITING_FOR_ARBITER,
@@ -23,6 +46,8 @@ contract Betcaster is Ownable {
         AWAITING_ARBITRATION,
         MAKER_WINS,
         TAKER_WINS,
+        COMPLETED_MAKER_WINS,
+        COMPLETED_TAKER_WINS,
         CANCELLED
     }
 
@@ -51,6 +76,11 @@ contract Betcaster is Ownable {
 
     // Modifiers
     // Constructor
+    /**
+     * @notice constructor is called at contract creation.
+     * @dev Owner is automatically set to deployer.
+     * @param protocolFee The fee taken from each bet to cover protocol costs (100 = 1%)
+     */
     constructor(uint256 protocolFee) Ownable(msg.sender) {
         s_prtocolFee = protocolFee;
     }
