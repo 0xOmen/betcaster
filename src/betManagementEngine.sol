@@ -30,11 +30,13 @@ contract BetManagementEngine is Ownable {
 
     // Events
     event BetCreated(uint256 indexed betNumber, BetTypes.Bet indexed bet);
-
+    event BetCancelled(uint256 indexed betNumber, address indexed calledBy, BetTypes.Bet indexed bet);
+    event BetAccepted(uint256 indexed betNumber, BetTypes.Bet indexed bet);
     /**
      * @notice Constructor for BetManagementEngine
      * @param _betcaster The address of the Betcaster contract
      */
+
     constructor(address _betcaster) Ownable(msg.sender) {
         i_betcaster = _betcaster;
     }
@@ -85,7 +87,35 @@ contract BetManagementEngine is Ownable {
         emit BetCreated(betNumber, newBet);
 
         // Transfer betAmount from maker to Betcaster contract
-        Betcaster(i_betcaster).transferBetAmount(msg.sender, _betTokenAddress, _betAmount);
+        Betcaster(i_betcaster).depositToBetcaster(msg.sender, _betTokenAddress, _betAmount);
+    }
+
+    function makerCancelBet(uint256 _betNumber) public {
+        BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
+        if (bet.maker != msg.sender) revert BetManagementEngine__NotMaker();
+        if (bet.status != BetTypes.Status.WAITING_FOR_TAKER) revert BetManagementEngine__BetNotWaitingForTaker();
+        bet.status = BetTypes.Status.CANCELLED;
+        Betcaster(i_betcaster).updateBetStatus(_betNumber, bet.status);
+
+        emit BetCancelled(_betNumber, msg.sender, bet);
+
+        Betcaster(i_betcaster).transferToUser(msg.sender, bet.betTokenAddress, bet.betAmount);
+    }
+
+    function acceptBet(uint256 _betNumber) public {
+        BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
+        if (bet.status != BetTypes.Status.WAITING_FOR_TAKER) revert BetManagementEngine__BetNotWaitingForTaker();
+        if (bet.taker == address(0)) {
+            bet.taker = msg.sender;
+            Betcaster(i_betcaster).updateBetTaker(_betNumber, msg.sender);
+        }
+        if (bet.taker != msg.sender) revert BetManagementEngine__NotTaker();
+        bet.status = BetTypes.Status.WAITING_FOR_ARBITER;
+        Betcaster(i_betcaster).updateBetStatus(_betNumber, bet.status);
+
+        emit BetAccepted(_betNumber, bet);
+
+        Betcaster(i_betcaster).depositToBetcaster(msg.sender, bet.betTokenAddress, bet.betAmount);
     }
 
     /**

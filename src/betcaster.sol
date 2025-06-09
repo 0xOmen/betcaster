@@ -17,7 +17,6 @@ import {BetTypes} from "./BetTypes.sol";
  * @dev This is the main contract that stores the state of every agreement.
  */
 contract Betcaster is Ownable {
-    error Betcaster__NotMaker();
     error Betcaster__BetNotWaitingForTaker();
     error Betcaster__NotMakerOrTaker();
     error Betcaster__BetNotWaitingForArbiter();
@@ -68,38 +67,23 @@ contract Betcaster is Ownable {
         s_allBets[_betNumber] = _bet;
     }
 
-    function transferBetAmount(address _maker, address _betTokenAddress, uint256 _betAmount)
+    function updateBetStatus(uint256 _betNumber, BetTypes.Status _status) public onlyBetManagementEngine {
+        s_allBets[_betNumber].status = _status;
+    }
+
+    function updateBetTaker(uint256 _betNumber, address _taker) public onlyBetManagementEngine {
+        s_allBets[_betNumber].taker = _taker;
+    }
+
+    function transferToUser(address _user, address _betTokenAddress, uint256 _betAmount)
         public
         onlyBetManagementEngine
     {
-        ERC20(_betTokenAddress).transferFrom(_maker, address(this), _betAmount);
+        ERC20(_betTokenAddress).transfer(_user, _betAmount);
     }
 
-    function makerCancelBet(uint256 _betNumber) public {
-        BetTypes.Bet memory bet = s_allBets[_betNumber];
-        if (bet.maker != msg.sender) revert Betcaster__NotMaker();
-        if (bet.status != BetTypes.Status.WAITING_FOR_TAKER) revert Betcaster__BetNotWaitingForTaker();
-        bet.status = BetTypes.Status.CANCELLED;
-        s_allBets[_betNumber].status = BetTypes.Status.CANCELLED;
-
-        emit BetCancelled(_betNumber, msg.sender, bet);
-
-        ERC20(bet.betTokenAddress).transfer(msg.sender, bet.betAmount);
-    }
-
-    function acceptBet(uint256 _betNumber) public {
-        BetTypes.Bet memory bet = s_allBets[_betNumber];
-        if (bet.status != BetTypes.Status.WAITING_FOR_TAKER) revert Betcaster__BetNotWaitingForTaker();
-        if (bet.taker == address(0)) {
-            bet.taker = msg.sender;
-            s_allBets[_betNumber].taker = msg.sender;
-        }
-        if (bet.taker != msg.sender) revert Betcaster__NotTaker();
-        s_allBets[_betNumber].status = BetTypes.Status.WAITING_FOR_ARBITER;
-
-        emit BetAccepted(_betNumber, bet);
-
-        ERC20(bet.betTokenAddress).transferFrom(msg.sender, address(this), bet.betAmount);
+    function depositToBetcaster(address _user, address _betTokenAddress, uint256 _betAmount) public {
+        ERC20(_betTokenAddress).transferFrom(_user, address(this), _betAmount);
     }
 
     function noArbiterCancelBet(uint256 _betNumber) public {

@@ -148,4 +148,80 @@ contract BetManagementEngineTest is Test {
             taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
         );
     }
+
+    /*//////////////////////////////////////////////////////////////
+                        MAKER CANCEL BET TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testMakerCancelBetSuccess() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet first
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        uint256 makerBalanceBefore = mockToken.balanceOf(maker);
+        uint256 contractBalanceBefore = mockToken.balanceOf(address(betcaster));
+
+        // Expect BetCancelled event
+        vm.expectEmit(true, true, false, false);
+        emit BetCancelled(1, maker, betcaster.getBet(1));
+
+        // Cancel bet
+        vm.prank(maker);
+        betManagementEngine.makerCancelBet(1);
+
+        // Verify bet status changed
+        BetTypes.Bet memory cancelledBet = betcaster.getBet(1);
+        assertEq(uint256(cancelledBet.status), uint256(BetTypes.Status.CANCELLED));
+
+        // Verify tokens were returned to maker
+        assertEq(mockToken.balanceOf(maker), makerBalanceBefore + BET_AMOUNT);
+        assertEq(mockToken.balanceOf(address(betcaster)), contractBalanceBefore - BET_AMOUNT);
+    }
+
+    function testMakerCancelBetRevertsWhenNotMaker() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        // Try to cancel as non-maker
+        vm.prank(taker);
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__NotMaker.selector);
+        betManagementEngine.makerCancelBet(1);
+
+        vm.prank(user1);
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__NotMaker.selector);
+        betManagementEngine.makerCancelBet(1);
+    }
+
+    function testMakerCancelBetRevertsWhenNotWaitingForTaker() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create and accept bet
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        // Try to cancel after bet is accepted
+        vm.prank(maker);
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__BetNotWaitingForTaker.selector);
+        betManagementEngine.makerCancelBet(1);
+    }
+
+    function testMakerCancelBetRevertsForNonExistentBet() public {
+        vm.prank(maker);
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__NotMaker.selector);
+        betManagementEngine.makerCancelBet(999);
+    }
 }
