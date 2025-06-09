@@ -7,8 +7,15 @@ import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 contract Betcaster is Ownable {
     error Betcaster__BetAmountMustBeGreaterThanZero();
     error Betcaster__EndTimeMustBeInTheFuture();
-
+    error Betcaster__NotMaker();
+    error Betcaster__BetNotWaitingForTaker();
+    error Betcaster__NotMakerOrTaker();
+    error Betcaster__BetNotWaitingForArbiter();
+    error Betcaster__StillInCooldown();
+    error Betcaster__NotTaker();
+    error Betcaster__BetNotInProcess();
     // Type declarations
+
     enum Status {
         WAITING_FOR_TAKER,
         WAITING_FOR_ARBITER,
@@ -39,6 +46,8 @@ contract Betcaster is Ownable {
 
     // Events
     event BetCreated(uint256 indexed betNumber, Bet indexed bet);
+    event BetCancelled(uint256 indexed betNumber, address indexed calledBy, Bet indexed bet);
+    event BetAccepted(uint256 indexed betNumber, Bet indexed bet);
 
     // Modifiers
     // Constructor
@@ -82,6 +91,47 @@ contract Betcaster is Ownable {
 
         // transfer betAmount from maker to betTokenAddress
         ERC20(_betTokenAddress).transferFrom(msg.sender, address(this), _betAmount);
+    }
+
+    function makerCancelBet(uint256 _betNumber) public {
+        Bet memory bet = s_allBets[_betNumber];
+        if (bet.maker != msg.sender) revert Betcaster__NotMaker();
+        if (bet.status != Status.WAITING_FOR_TAKER) revert Betcaster__BetNotWaitingForTaker();
+        bet.status = Status.CANCELLED;
+        s_allBets[_betNumber].status = Status.CANCELLED;
+
+        emit BetCancelled(_betNumber, msg.sender, bet);
+
+        ERC20(bet.betTokenAddress).transfer(msg.sender, bet.betAmount);
+    }
+
+    function acceptBet(uint256 _betNumber) public {
+        Bet memory bet = s_allBets[_betNumber];
+        if (bet.status != Status.WAITING_FOR_TAKER) revert Betcaster__BetNotWaitingForTaker();
+        if (bet.taker == address(0)) {
+            bet.taker = msg.sender;
+            s_allBets[_betNumber].taker = msg.sender;
+        }
+        if (bet.taker != msg.sender) revert Betcaster__NotTaker();
+        s_allBets[_betNumber].status = Status.WAITING_FOR_ARBITER;
+
+        emit BetAccepted(_betNumber, bet);
+
+        ERC20(bet.betTokenAddress).transferFrom(msg.sender, address(this), bet.betAmount);
+    }
+
+    function noArbiterCancelBet(uint256 _betNumber) public {
+        Bet memory bet = s_allBets[_betNumber];
+        if (bet.maker != msg.sender && bet.taker != msg.sender) revert Betcaster__NotMakerOrTaker();
+        if (bet.status != Status.WAITING_FOR_ARBITER) revert Betcaster__BetNotWaitingForArbiter();
+        if (block.timestamp < bet.timestamp + 1 hours) revert Betcaster__StillInCooldown();
+        bet.status = Status.CANCELLED;
+        s_allBets[_betNumber].status = Status.CANCELLED;
+
+        emit BetCancelled(_betNumber, msg.sender, bet);
+
+        ERC20(bet.betTokenAddress).transfer(bet.maker, bet.betAmount);
+        ERC20(bet.betTokenAddress).transfer(bet.taker, bet.betAmount);
     }
 
     // internal

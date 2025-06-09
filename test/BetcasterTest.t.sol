@@ -25,6 +25,8 @@ contract BetcasterTest is Test {
 
     // Events for testing
     event BetCreated(uint256 indexed betNumber, Betcaster.Bet indexed bet);
+    event BetCancelled(uint256 indexed betNumber, address indexed calledBy, Betcaster.Bet indexed bet);
+    event BetAccepted(uint256 indexed betNumber, Betcaster.Bet indexed bet);
 
     function setUp() public {
         // Deploy contracts
@@ -179,6 +181,322 @@ contract BetcasterTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
+                        MAKER CANCEL BET TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testMakerCancelBetSuccess() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet first
+        vm.prank(maker);
+        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+
+        uint256 makerBalanceBefore = mockToken.balanceOf(maker);
+        uint256 contractBalanceBefore = mockToken.balanceOf(address(betcaster));
+
+        // Expect BetCancelled event
+        vm.expectEmit(true, true, false, false);
+        emit BetCancelled(1, maker, betcaster.getBet(1));
+
+        // Cancel bet
+        vm.prank(maker);
+        betcaster.makerCancelBet(1);
+
+        // Verify bet status changed
+        Betcaster.Bet memory cancelledBet = betcaster.getBet(1);
+        assertEq(uint256(cancelledBet.status), uint256(Betcaster.Status.CANCELLED));
+
+        // Verify tokens were returned to maker
+        assertEq(mockToken.balanceOf(maker), makerBalanceBefore + BET_AMOUNT);
+        assertEq(mockToken.balanceOf(address(betcaster)), contractBalanceBefore - BET_AMOUNT);
+    }
+
+    function testMakerCancelBetRevertsWhenNotMaker() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet
+        vm.prank(maker);
+        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+
+        // Try to cancel as non-maker
+        vm.prank(taker);
+        vm.expectRevert(Betcaster.Betcaster__NotMaker.selector);
+        betcaster.makerCancelBet(1);
+
+        vm.prank(user1);
+        vm.expectRevert(Betcaster.Betcaster__NotMaker.selector);
+        betcaster.makerCancelBet(1);
+    }
+
+    function testMakerCancelBetRevertsWhenNotWaitingForTaker() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create and accept bet
+        vm.prank(maker);
+        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+
+        vm.prank(taker);
+        betcaster.acceptBet(1);
+
+        // Try to cancel after bet is accepted
+        vm.prank(maker);
+        vm.expectRevert(Betcaster.Betcaster__BetNotWaitingForTaker.selector);
+        betcaster.makerCancelBet(1);
+    }
+
+    function testMakerCancelBetRevertsForNonExistentBet() public {
+        vm.prank(maker);
+        vm.expectRevert(Betcaster.Betcaster__NotMaker.selector);
+        betcaster.makerCancelBet(999);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            ACCEPT BET TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testAcceptBetSuccessWithSpecificTaker() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet with specific taker
+        vm.prank(maker);
+        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+
+        uint256 takerBalanceBefore = mockToken.balanceOf(taker);
+        uint256 contractBalanceBefore = mockToken.balanceOf(address(betcaster));
+
+        // Expect BetAccepted event
+        vm.expectEmit(true, true, false, false);
+        emit BetAccepted(1, betcaster.getBet(1));
+
+        // Accept bet
+        vm.prank(taker);
+        betcaster.acceptBet(1);
+
+        // Verify bet status changed
+        Betcaster.Bet memory acceptedBet = betcaster.getBet(1);
+        assertEq(uint256(acceptedBet.status), uint256(Betcaster.Status.WAITING_FOR_ARBITER));
+        assertEq(acceptedBet.taker, taker);
+
+        // Verify tokens were transferred from taker
+        assertEq(mockToken.balanceOf(taker), takerBalanceBefore - BET_AMOUNT);
+        assertEq(mockToken.balanceOf(address(betcaster)), contractBalanceBefore + BET_AMOUNT);
+    }
+
+    function testAcceptBetSuccessWithOpenTaker() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet with open taker (address(0))
+        vm.prank(maker);
+        betcaster.createBet(address(0), arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+
+        uint256 user1BalanceBefore = mockToken.balanceOf(user1);
+        uint256 contractBalanceBefore = mockToken.balanceOf(address(betcaster));
+
+        // Accept bet as user1
+        vm.prank(user1);
+        betcaster.acceptBet(1);
+
+        // Verify bet status and taker updated
+        Betcaster.Bet memory acceptedBet = betcaster.getBet(1);
+        assertEq(uint256(acceptedBet.status), uint256(Betcaster.Status.WAITING_FOR_ARBITER));
+        assertEq(acceptedBet.taker, user1);
+
+        // Verify tokens were transferred
+        assertEq(mockToken.balanceOf(user1), user1BalanceBefore - BET_AMOUNT);
+        assertEq(mockToken.balanceOf(address(betcaster)), contractBalanceBefore + BET_AMOUNT);
+    }
+
+    function testAcceptBetRevertsWhenNotWaitingForTaker() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create and accept bet
+        vm.prank(maker);
+        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+
+        vm.prank(taker);
+        betcaster.acceptBet(1);
+
+        // Try to accept again
+        vm.prank(taker);
+        vm.expectRevert(Betcaster.Betcaster__BetNotWaitingForTaker.selector);
+        betcaster.acceptBet(1);
+    }
+
+    function testAcceptBetRevertsWhenNotDesignatedTaker() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet with specific taker
+        vm.prank(maker);
+        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+
+        // Try to accept as wrong user
+        vm.prank(user1);
+        vm.expectRevert(Betcaster.Betcaster__NotTaker.selector);
+        betcaster.acceptBet(1);
+    }
+
+    function testAcceptBetRevertsWithInsufficientBalance() public {
+        uint256 endTime = block.timestamp + 1 days;
+        address poorTaker = makeAddr("poorTaker");
+
+        // Create bet with poor taker
+        vm.prank(maker);
+        betcaster.createBet(poorTaker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+
+        // Try to accept without sufficient balance
+        vm.prank(poorTaker);
+        vm.expectRevert(); // ERC20 transfer will revert
+        betcaster.acceptBet(1);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        NO ARBITER CANCEL BET TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testNoArbiterCancelBetSuccessByMaker() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet
+        vm.prank(maker);
+        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+
+        // Accept bet to set status to WAITING_FOR_ARBITER
+        vm.prank(taker);
+        betcaster.acceptBet(1);
+
+        // Verify status is now WAITING_FOR_ARBITER
+        assertEq(uint256(betcaster.getBet(1).status), uint256(Betcaster.Status.WAITING_FOR_ARBITER));
+
+        // Fast forward time past cooldown (1 hour)
+        vm.warp(block.timestamp + 2 hours);
+
+        uint256 makerBalanceBefore = mockToken.balanceOf(maker);
+        uint256 takerBalanceBefore = mockToken.balanceOf(taker);
+        uint256 contractBalanceBefore = mockToken.balanceOf(address(betcaster));
+
+        // Expect BetCancelled event
+        vm.expectEmit(true, true, false, false);
+        emit BetCancelled(1, maker, betcaster.getBet(1));
+
+        // Cancel bet as maker
+        vm.prank(maker);
+        betcaster.noArbiterCancelBet(1);
+
+        // Verify bet status changed to CANCELLED
+        assertEq(uint256(betcaster.getBet(1).status), uint256(Betcaster.Status.CANCELLED));
+
+        // Verify token transfers
+        // Note: There's a potential bug in the contract - it tries to transfer arbiterFee to taker
+        // but the arbiterFee might be larger than what's available. Let's test what actually happens.
+        assertEq(mockToken.balanceOf(maker), makerBalanceBefore + BET_AMOUNT);
+        assertEq(mockToken.balanceOf(taker), takerBalanceBefore + BET_AMOUNT);
+        assertEq(mockToken.balanceOf(address(betcaster)), contractBalanceBefore - BET_AMOUNT - BET_AMOUNT);
+    }
+
+    function testNoArbiterCancelBetSuccessByTaker() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet
+        vm.prank(maker);
+        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+
+        // Accept bet
+        vm.prank(taker);
+        betcaster.acceptBet(1);
+
+        // Fast forward time past cooldown
+        vm.warp(block.timestamp + 2 hours);
+
+        uint256 makerBalanceBefore = mockToken.balanceOf(maker);
+        uint256 takerBalanceBefore = mockToken.balanceOf(taker);
+
+        // Expect BetCancelled event
+        vm.expectEmit(true, true, false, false);
+        emit BetCancelled(1, taker, betcaster.getBet(1));
+
+        // Cancel bet as taker
+        vm.prank(taker);
+        betcaster.noArbiterCancelBet(1);
+
+        // Verify bet status changed
+        assertEq(uint256(betcaster.getBet(1).status), uint256(Betcaster.Status.CANCELLED));
+
+        // Verify token transfers
+        assertEq(mockToken.balanceOf(maker), makerBalanceBefore + BET_AMOUNT);
+        assertEq(mockToken.balanceOf(taker), takerBalanceBefore + BET_AMOUNT);
+    }
+
+    function testNoArbiterCancelBetRevertsWhenNotMakerOrTaker() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet
+        vm.prank(maker);
+        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+
+        // Try to cancel as unauthorized user
+        vm.prank(user1);
+        vm.expectRevert(Betcaster.Betcaster__NotMakerOrTaker.selector);
+        betcaster.noArbiterCancelBet(1);
+    }
+
+    function testNoArbiterCancelBetRevertsWhenNotWaitingForArbiter() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet (status is WAITING_FOR_TAKER)
+        vm.prank(maker);
+        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+
+        // Try to cancel when not in WAITING_FOR_ARBITER status
+        vm.prank(maker);
+        vm.expectRevert(Betcaster.Betcaster__BetNotWaitingForArbiter.selector);
+        betcaster.noArbiterCancelBet(1);
+    }
+
+    function testNoArbiterCancelBetRevertsWhenStillInCooldown() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create and accept bet
+        vm.prank(maker);
+        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+
+        vm.prank(taker);
+        betcaster.acceptBet(1);
+
+        // Fast forward only 30 minutes (less than 1 hour cooldown)
+        vm.warp(block.timestamp + 30 minutes);
+
+        vm.prank(maker);
+        vm.expectRevert(Betcaster.Betcaster__StillInCooldown.selector);
+        betcaster.noArbiterCancelBet(1);
+    }
+
+    function testNoArbiterCancelBetJustAfterCooldown() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create and accept bet
+        vm.prank(maker);
+        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+
+        vm.prank(taker);
+        betcaster.acceptBet(1);
+
+        // Fast forward just past 1 hour (1 second more)
+        vm.warp(block.timestamp + 1 hours + 1);
+
+        // Should succeed now
+        vm.prank(maker);
+        betcaster.noArbiterCancelBet(1);
+
+        assertEq(uint256(betcaster.getBet(1).status), uint256(Betcaster.Status.CANCELLED));
+    }
+
+    function testNoArbiterCancelBetForNonExistentBet() public {
+        vm.prank(maker);
+        vm.expectRevert(Betcaster.Betcaster__NotMakerOrTaker.selector);
+        betcaster.noArbiterCancelBet(999);
+    }
+
+    /*//////////////////////////////////////////////////////////////
                         MULTIPLE BETS TESTS
     //////////////////////////////////////////////////////////////*/
 
@@ -211,6 +529,29 @@ contract BetcasterTest is Test {
 
         // Verify contract holds both bet amounts
         assertEq(mockToken.balanceOf(address(betcaster)), BET_AMOUNT + (BET_AMOUNT / 2));
+    }
+
+    function testMultipleBetOperations() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create multiple bets
+        vm.prank(maker);
+        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, "Bet 1");
+
+        vm.prank(user1);
+        betcaster.createBet(user2, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, "Bet 2");
+
+        // Cancel first bet
+        vm.prank(maker);
+        betcaster.makerCancelBet(1);
+
+        // Accept second bet
+        vm.prank(user2);
+        betcaster.acceptBet(2);
+
+        // Verify states
+        assertEq(uint256(betcaster.getBet(1).status), uint256(Betcaster.Status.CANCELLED));
+        assertEq(uint256(betcaster.getBet(2).status), uint256(Betcaster.Status.WAITING_FOR_ARBITER));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -306,5 +647,25 @@ contract BetcasterTest is Test {
         assertEq(bet.maker, maker);
         assertEq(uint256(bet.status), uint256(Betcaster.Status.WAITING_FOR_TAKER));
         assertTrue(bet.timestamp <= block.timestamp);
+    }
+
+    function testFullBetAcceptanceFlow() public {
+        uint256 endTime = block.timestamp + 1 days;
+        uint256 initialMakerBalance = mockToken.balanceOf(maker);
+        uint256 initialTakerBalance = mockToken.balanceOf(taker);
+
+        // Create bet
+        vm.prank(maker);
+        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+
+        // Accept bet
+        vm.prank(taker);
+        betcaster.acceptBet(1);
+
+        // Verify final state
+        assertEq(mockToken.balanceOf(maker), initialMakerBalance - BET_AMOUNT);
+        assertEq(mockToken.balanceOf(taker), initialTakerBalance - BET_AMOUNT);
+        assertEq(mockToken.balanceOf(address(betcaster)), BET_AMOUNT * 2);
+        assertEq(uint256(betcaster.getBet(1).status), uint256(Betcaster.Status.WAITING_FOR_ARBITER));
     }
 }
