@@ -1,66 +1,33 @@
-## Foundry
+# Betcaster - Wager with Confidence
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+Bespoke bets for refined degenerates
 
-Foundry consists of:
+## Game Frontend URL
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+[]()
 
-## Documentation
+# Roles
 
-https://book.getfoundry.sh/
+Maker - Bet creator. Defines initial terms of the bet including Taker (if included), Arbiter, bet token and size, and initial terms of the bet.
 
-## Usage
+Taker - The address that accepts the terms of the bet as laid out by the Maker.
 
-### Build
+Arbiter - Address that determines the outcome of the bet.
 
-```shell
-$ forge build
-```
+## Bet Creation
 
-### Test
+Maker defines initial terms: Taker (can be open), Arbiter, Bet token and size, end time, Arbiter fee, and initial terms. Maker can cancel bet any time before Taker accepts the bet and get their tokens back. Maker can also change the terms of the bet text any time before Taker accepts the bet.
 
-```shell
-$ forge test
-```
+## Taker Actions
 
-### Format
+Taker can accept the terms as laid out by the Maker.
 
-```shell
-$ forge fmt
-```
+## Arbiter
 
-### Gas Snapshots
+The arbiter decides the outcome of the bet once the End Time is reached. The Arbiter address must be different than the Maker and Taker Addresses. The Arbiter recieves the Arbiter Fee upon deciding the outcome of the bet.
 
-```shell
-$ forge snapshot
-```
+## Cancelling bets
 
-### Anvil
+If the Arbiter does not accept it's role, the Maker and Taker can cancel the bet and have their tokens returned.
 
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+## Emergency Withdraw
