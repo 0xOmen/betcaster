@@ -7,10 +7,12 @@ import {BetManagementEngine} from "../src/betManagementEngine.sol";
 import {ERC20Mock} from "lib/openzeppelin-contracts/contracts/mocks/token/ERC20Mock.sol";
 import {BetTypes} from "../src/BetTypes.sol";
 import {DeployBetcaster} from "../script/DeployBetcaster.s.sol";
+import {ArbiterManagementEngine} from "../src/arbiterManagementEngine.sol";
 
 contract BetcasterTest is Test {
     Betcaster public betcaster;
     BetManagementEngine public betManagementEngine;
+    ArbiterManagementEngine public arbiterManagementEngine;
     ERC20Mock public mockToken;
 
     // Test addresses
@@ -36,7 +38,7 @@ contract BetcasterTest is Test {
         // Deploy contracts
         DeployBetcaster deployer = new DeployBetcaster();
         address wethTokenAddr;
-        (betcaster, betManagementEngine, wethTokenAddr) = deployer.run();
+        (betcaster, betManagementEngine, arbiterManagementEngine, wethTokenAddr) = deployer.run();
         mockToken = new ERC20Mock();
 
         // Mint tokens to test addresses

@@ -5,11 +5,12 @@ import {Script} from "forge-std/Script.sol";
 import {HelperConfig} from "./HelperConfig.s.sol";
 import {Betcaster} from "../src/betcaster.sol";
 import {BetManagementEngine} from "../src/betManagementEngine.sol";
+import {ArbiterManagementEngine} from "../src/arbiterManagementEngine.sol";
 
 contract DeployBetcaster is Script {
     uint256 public constant PROTOCOL_FEE = 50; // 0.5%
 
-    function run() public returns (Betcaster, BetManagementEngine, address) {
+    function run() public returns (Betcaster, BetManagementEngine, ArbiterManagementEngine, address) {
         HelperConfig helperConfig = new HelperConfig();
         (address weth, uint256 deployerKey) = helperConfig.activeNetworkConfig();
 
@@ -20,9 +21,11 @@ contract DeployBetcaster is Script {
         }
         Betcaster betcaster = new Betcaster(PROTOCOL_FEE);
         BetManagementEngine betManagementEngine = new BetManagementEngine(address(betcaster));
+        ArbiterManagementEngine arbiterManagementEngine = new ArbiterManagementEngine(address(betcaster));
         betcaster.setBetManagementEngine(address(betManagementEngine));
+        betcaster.setArbiterManagementEngine(address(arbiterManagementEngine));
         vm.stopBroadcast();
 
-        return (betcaster, betManagementEngine, weth);
+        return (betcaster, betManagementEngine, arbiterManagementEngine, weth);
     }
 }

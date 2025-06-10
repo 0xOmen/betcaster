@@ -24,20 +24,27 @@ contract Betcaster is Ownable {
     error Betcaster__NotTaker();
     error Betcaster__BetNotInProcess();
     error Betcaster__NotBetManagementEngine();
+    error Betcaster__NotArbiterManagementEngine();
 
     // State variables
     uint256 public s_prtocolFee;
     uint256 private s_betNumber;
     mapping(uint256 => BetTypes.Bet) private s_allBets;
     address private s_betManagementEngine;
+    address private s_arbiterManagementEngine;
 
     // Events
-    event BetCancelled(uint256 indexed betNumber, address indexed calledBy, BetTypes.Bet indexed bet);
-    event BetAccepted(uint256 indexed betNumber, BetTypes.Bet indexed bet);
+    event BetManagementEngineSet(address indexed betManagementEngine);
+    event ArbiterManagementEngineSet(address indexed arbiterManagementEngine);
 
     // Modifiers
     modifier onlyBetManagementEngine() {
         if (msg.sender != s_betManagementEngine) revert Betcaster__NotBetManagementEngine();
+        _;
+    }
+
+    modifier onlyArbiterManagementEngine() {
+        if (msg.sender != s_arbiterManagementEngine) revert Betcaster__NotArbiterManagementEngine();
         _;
     }
 
@@ -56,6 +63,12 @@ contract Betcaster is Ownable {
     // public functions
     function setBetManagementEngine(address _betManagementEngine) public onlyOwner {
         s_betManagementEngine = _betManagementEngine;
+        emit BetManagementEngineSet(_betManagementEngine);
+    }
+
+    function setArbiterManagementEngine(address _arbiterManagementEngine) public onlyOwner {
+        s_arbiterManagementEngine = _arbiterManagementEngine;
+        emit ArbiterManagementEngineSet(_arbiterManagementEngine);
     }
 
     function increaseBetNumber() public onlyBetManagementEngine returns (uint256) {
@@ -71,8 +84,16 @@ contract Betcaster is Ownable {
         s_allBets[_betNumber].status = _status;
     }
 
+    function arbiterUpdateBetStatus(uint256 _betNumber, BetTypes.Status _status) public onlyArbiterManagementEngine {
+        s_allBets[_betNumber].status = _status;
+    }
+
     function updateBetTaker(uint256 _betNumber, address _taker) public onlyBetManagementEngine {
         s_allBets[_betNumber].taker = _taker;
+    }
+
+    function updateBetArbiter(uint256 _betNumber, address _arbiter) public onlyArbiterManagementEngine {
+        s_allBets[_betNumber].arbiter = _arbiter;
     }
 
     function transferTokensToUser(address _user, address _betTokenAddress, uint256 _betAmount)
