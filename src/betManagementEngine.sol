@@ -36,6 +36,7 @@ contract BetManagementEngine is Ownable {
     event BetCancelled(uint256 indexed betNumber, address indexed calledBy, BetTypes.Bet indexed bet);
     event BetAccepted(uint256 indexed betNumber, BetTypes.Bet indexed bet);
     event BetClaimed(uint256 indexed betNumber, address indexed winner, BetTypes.Status indexed status);
+    event BetForfeited(uint256 indexed betNumber, address indexed calledBy, BetTypes.Bet indexed bet);
 
     /**
      * @notice Constructor for BetManagementEngine
@@ -184,6 +185,28 @@ contract BetManagementEngine is Ownable {
         Betcaster(i_betcaster).transferTokensToUser(winner, bet.betTokenAddress, winnerTake);
         //transfer protocol rake to owner
         Betcaster(i_betcaster).transferTokensToUser(owner(), bet.betTokenAddress, protocolRake);
+    }
+
+    /**
+     * @notice Allows Maker or Taker to forfeit bet early.
+     * Forfieter gives up tokens, no aribter fee is taken.
+     * @notice Bet must be in process.
+     * @notice sender must be maker or taker.
+     * @param _betNumber The number of the bet to forfeit
+     */
+    function forfeitBet(uint256 _betNumber) public {
+        BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
+        if (bet.status != BetTypes.Status.IN_PROCESS) revert BetManagementEngine__BetNotInProcess();
+        if (bet.maker == msg.sender) {
+            bet.status = BetTypes.Status.TAKER_WINS;
+        } else if (bet.taker == msg.sender) {
+            bet.status = BetTypes.Status.MAKER_WINS;
+        } else {
+            revert BetManagementEngine__NotMakerOrTaker();
+        }
+        emit BetForfeited(_betNumber, msg.sender, bet);
+        Betcaster(i_betcaster).setBetArbiterFeeToZero(_betNumber);
+        Betcaster(i_betcaster).updateBetStatus(_betNumber, bet.status);
     }
 
     /**

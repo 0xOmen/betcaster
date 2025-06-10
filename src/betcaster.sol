@@ -104,6 +104,10 @@ contract Betcaster is Ownable {
         s_allBets[_betNumber].arbiter = _arbiter;
     }
 
+    function setBetArbiterFeeToZero(uint256 _betNumber) public onlyBetManagementEngine {
+        s_allBets[_betNumber].arbiterFee = 0;
+    }
+
     function transferTokensToUser(address _user, address _betTokenAddress, uint256 _betAmount)
         public
         onlyBetManagementEngine
