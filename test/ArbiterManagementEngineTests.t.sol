@@ -26,7 +26,7 @@ contract ArbiterManagementEngineTest is Test {
     uint256 public constant PROTOCOL_FEE = 100; // 1%
     uint256 public constant BET_AMOUNT = 1000e18;
     uint256 public constant ARBITER_FEE = 50; // 0.5%
-    uint256 public constant INITIAL_TOKEN_SUPPLY = 1000000e18;
+    uint256 public constant INITIAL_TOKEN_SUPPLY = 1000000000e18;
     string public constant BET_AGREEMENT = "Team A will win the match";
 
     // Events for testing

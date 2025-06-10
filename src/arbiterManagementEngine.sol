@@ -41,7 +41,7 @@ contract ArbiterManagementEngine is Ownable {
         if (bet.status != BetTypes.Status.IN_PROCESS) {
             revert ArbiterManagementEngine__BetNotInProcess();
         }
-        if (bet.endTime < block.timestamp) {
+        if (block.timestamp < bet.endTime) {
             revert ArbiterManagementEngine__EndTimeNotReached();
         }
         if (bet.arbiter != msg.sender) {
