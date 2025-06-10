@@ -27,6 +27,7 @@ contract BetManagementEngine is Ownable {
     error BetManagementEngine__BetNotInProcess();
     error BetManagementEngine__BetNotClaimable();
     error BetManagementEngine__BetAmountMismatch();
+    error BetManagementEngine__TakerCannotBeArbiterOrMaker();
 
     address immutable i_betcaster;
 
@@ -65,6 +66,9 @@ contract BetManagementEngine is Ownable {
     ) public {
         if (_betAmount <= 0) revert BetManagementEngine__BetAmountMustBeGreaterThanZero();
         if (_endTime <= block.timestamp) revert BetManagementEngine__EndTimeMustBeInTheFuture();
+        if (_taker == msg.sender || _arbiter == msg.sender) {
+            revert BetManagementEngine__TakerCannotBeArbiterOrMaker();
+        }
 
         // Get new bet number from Betcaster
         uint256 betNumber = Betcaster(i_betcaster).increaseBetNumber();
@@ -93,6 +97,10 @@ contract BetManagementEngine is Ownable {
         Betcaster(i_betcaster).depositToBetcaster(msg.sender, _betTokenAddress, _betAmount);
     }
 
+    /**
+     * @notice Allows Maker to cancel bet if no taker has accepted.  Returns tokens to maker with no fee.
+     * @param _betNumber The number of the bet to cancel
+     */
     function makerCancelBet(uint256 _betNumber) public {
         BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
         if (bet.maker != msg.sender) revert BetManagementEngine__NotMaker();
@@ -105,10 +113,17 @@ contract BetManagementEngine is Ownable {
         Betcaster(i_betcaster).transferTokensToUser(msg.sender, bet.betTokenAddress, bet.betAmount);
     }
 
+    /**
+     * @notice Allows Taker to accept bet.  If bet.taker is address(0), it assigns taker to msg.sender.
+     * @param _betNumber The number of the bet to accept
+     */
     function acceptBet(uint256 _betNumber) public {
         BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
         if (bet.status != BetTypes.Status.WAITING_FOR_TAKER) revert BetManagementEngine__BetNotWaitingForTaker();
         if (bet.taker == address(0)) {
+            if (bet.maker == msg.sender || bet.arbiter == msg.sender) {
+                revert BetManagementEngine__TakerCannotBeArbiterOrMaker();
+            }
             bet.taker = msg.sender;
             Betcaster(i_betcaster).updateBetTaker(_betNumber, msg.sender);
         }
@@ -121,6 +136,12 @@ contract BetManagementEngine is Ownable {
         Betcaster(i_betcaster).depositToBetcaster(msg.sender, bet.betTokenAddress, bet.betAmount);
     }
 
+    /**
+     * @notice Allows Maker or Taker to cancel bet if no arbiter has been assigned.
+     * Returns tokens to maker and taker with no fee.
+     * @notice Must wait 1 hour after bet is created to cancel.
+     * @param _betNumber The number of the bet to cancel
+     */
     function noArbiterCancelBet(uint256 _betNumber) public {
         BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
         if (bet.maker != msg.sender && bet.taker != msg.sender) revert BetManagementEngine__NotMakerOrTaker();
@@ -135,6 +156,11 @@ contract BetManagementEngine is Ownable {
         Betcaster(i_betcaster).transferTokensToUser(bet.taker, bet.betTokenAddress, bet.betAmount);
     }
 
+    /**
+     * @notice Allows claim bet if bet is completed. Can be called by anyone
+     * @dev Sends protocol fee to owner of contract address. Does NOT send arbiter fee to arbiter which is done in arbiterManagementEngine.
+     * @param _betNumber The number of the bet to claim
+     */
     function claimBet(uint256 _betNumber) public {
         BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
         address winner;
