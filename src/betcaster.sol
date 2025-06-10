@@ -82,22 +82,11 @@ contract Betcaster is Ownable {
         ERC20(_betTokenAddress).transfer(_user, _betAmount);
     }
 
-    function depositToBetcaster(address _user, address _betTokenAddress, uint256 _betAmount) public {
+    function depositToBetcaster(address _user, address _betTokenAddress, uint256 _betAmount)
+        public
+        onlyBetManagementEngine
+    {
         ERC20(_betTokenAddress).transferFrom(_user, address(this), _betAmount);
-    }
-
-    function noArbiterCancelBet(uint256 _betNumber) public {
-        BetTypes.Bet memory bet = s_allBets[_betNumber];
-        if (bet.maker != msg.sender && bet.taker != msg.sender) revert Betcaster__NotMakerOrTaker();
-        if (bet.status != BetTypes.Status.WAITING_FOR_ARBITER) revert Betcaster__BetNotWaitingForArbiter();
-        if (block.timestamp < bet.timestamp + 1 hours) revert Betcaster__StillInCooldown();
-        bet.status = BetTypes.Status.CANCELLED;
-        s_allBets[_betNumber].status = BetTypes.Status.CANCELLED;
-
-        emit BetCancelled(_betNumber, msg.sender, bet);
-
-        ERC20(bet.betTokenAddress).transfer(bet.maker, bet.betAmount);
-        ERC20(bet.betTokenAddress).transfer(bet.taker, bet.betAmount);
     }
 
     // internal

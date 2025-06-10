@@ -118,6 +118,20 @@ contract BetManagementEngine is Ownable {
         Betcaster(i_betcaster).depositToBetcaster(msg.sender, bet.betTokenAddress, bet.betAmount);
     }
 
+    function noArbiterCancelBet(uint256 _betNumber) public {
+        BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
+        if (bet.maker != msg.sender && bet.taker != msg.sender) revert BetManagementEngine__NotMakerOrTaker();
+        if (bet.status != BetTypes.Status.WAITING_FOR_ARBITER) revert BetManagementEngine__BetNotWaitingForArbiter();
+        if (block.timestamp < bet.timestamp + 1 hours) revert BetManagementEngine__StillInCooldown();
+        bet.status = BetTypes.Status.CANCELLED;
+        Betcaster(i_betcaster).updateBetStatus(_betNumber, bet.status);
+
+        emit BetCancelled(_betNumber, msg.sender, bet);
+
+        Betcaster(i_betcaster).transferToUser(bet.maker, bet.betTokenAddress, bet.betAmount);
+        Betcaster(i_betcaster).transferToUser(bet.taker, bet.betTokenAddress, bet.betAmount);
+    }
+
     /**
      * @notice Gets the Betcaster contract address
      * @return The address of the Betcaster contract
