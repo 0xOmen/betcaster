@@ -9,10 +9,14 @@ import {Betcaster} from "./betcaster.sol";
 contract ArbiterManagementEngine is Ownable {
     error ArbiterManagementEngine__NotArbiter();
     error ArbiterManagementEngine__BetNotWaitingForArbiter();
+    error ArbiterManagementEngine__BetNotInProcess();
+    error ArbiterManagementEngine__EndTimeNotReached();
+    error ArbiterManagementEngine__WinnerNotValid();
 
     address private s_betcaster;
 
     event ArbiterAcceptedRole(uint256 indexed betNumber, address indexed arbiter);
+    event WinnerSelected(uint256 indexed betNumber, address indexed winner);
 
     constructor(address _betcaster) Ownable(msg.sender) {
         s_betcaster = _betcaster;
@@ -30,5 +34,29 @@ contract ArbiterManagementEngine is Ownable {
         }
         emit ArbiterAcceptedRole(_betNumber, msg.sender);
         Betcaster(s_betcaster).arbiterUpdateBetStatus(_betNumber, BetTypes.Status.IN_PROCESS);
+    }
+
+    function selectWinner(uint256 _betNumber, address _winner) public {
+        BetTypes.Bet memory bet = Betcaster(s_betcaster).getBet(_betNumber);
+        if (bet.status != BetTypes.Status.IN_PROCESS) {
+            revert ArbiterManagementEngine__BetNotInProcess();
+        }
+        if (bet.endTime < block.timestamp) {
+            revert ArbiterManagementEngine__EndTimeNotReached();
+        }
+        if (bet.arbiter != msg.sender) {
+            revert ArbiterManagementEngine__NotArbiter();
+        }
+        if (bet.maker == _winner) {
+            Betcaster(s_betcaster).arbiterUpdateBetStatus(_betNumber, BetTypes.Status.MAKER_WINS);
+            emit WinnerSelected(_betNumber, _winner);
+        } else if (bet.taker == _winner) {
+            Betcaster(s_betcaster).arbiterUpdateBetStatus(_betNumber, BetTypes.Status.TAKER_WINS);
+            emit WinnerSelected(_betNumber, _winner);
+        } else {
+            revert ArbiterManagementEngine__WinnerNotValid();
+        }
+        uint256 arbiterFee = (bet.betAmount * 2) * bet.arbiterFee / 10000;
+        Betcaster(s_betcaster).transferTokensToArbiter(arbiterFee, bet.arbiter, bet.betTokenAddress);
     }
 }

@@ -110,6 +110,13 @@ contract Betcaster is Ownable {
         ERC20(_betTokenAddress).transferFrom(_user, address(this), _betAmount);
     }
 
+    function transferTokensToArbiter(uint256 _betAmount, address _arbiter, address _betTokenAddress)
+        public
+        onlyArbiterManagementEngine
+    {
+        ERC20(_betTokenAddress).transfer(_arbiter, _betAmount);
+    }
+
     // internal
     // private
     // view & pure functions
