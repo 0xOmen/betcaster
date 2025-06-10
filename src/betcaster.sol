@@ -75,7 +75,7 @@ contract Betcaster is Ownable {
         s_allBets[_betNumber].taker = _taker;
     }
 
-    function transferToUser(address _user, address _betTokenAddress, uint256 _betAmount)
+    function transferTokensToUser(address _user, address _betTokenAddress, uint256 _betAmount)
         public
         onlyBetManagementEngine
     {

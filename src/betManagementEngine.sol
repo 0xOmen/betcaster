@@ -99,7 +99,7 @@ contract BetManagementEngine is Ownable {
 
         emit BetCancelled(_betNumber, msg.sender, bet);
 
-        Betcaster(i_betcaster).transferToUser(msg.sender, bet.betTokenAddress, bet.betAmount);
+        Betcaster(i_betcaster).transferTokensToUser(msg.sender, bet.betTokenAddress, bet.betAmount);
     }
 
     function acceptBet(uint256 _betNumber) public {
@@ -128,8 +128,8 @@ contract BetManagementEngine is Ownable {
 
         emit BetCancelled(_betNumber, msg.sender, bet);
 
-        Betcaster(i_betcaster).transferToUser(bet.maker, bet.betTokenAddress, bet.betAmount);
-        Betcaster(i_betcaster).transferToUser(bet.taker, bet.betTokenAddress, bet.betAmount);
+        Betcaster(i_betcaster).transferTokensToUser(bet.maker, bet.betTokenAddress, bet.betAmount);
+        Betcaster(i_betcaster).transferTokensToUser(bet.taker, bet.betTokenAddress, bet.betAmount);
     }
 
     /**
