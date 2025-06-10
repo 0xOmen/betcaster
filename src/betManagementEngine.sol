@@ -210,6 +210,26 @@ contract BetManagementEngine is Ownable {
     }
 
     /**
+     * @notice Allows Maker or Taker to emergency cancel bet if arbiter does not arbitrate.
+     * Returns tokens to maker and taker with no fee.
+     * @notice Must wait the defined cooldown time after bet end time to cancel.
+     * @param _betNumber The number of the bet to cancel
+     */
+    function emergencyCancel(uint256 _betNumber) public {
+        BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
+        if (bet.status != BetTypes.Status.IN_PROCESS) revert BetManagementEngine__BetNotInProcess();
+        if (msg.sender != bet.maker && msg.sender != bet.taker) revert BetManagementEngine__NotMakerOrTaker();
+        if (block.timestamp < bet.endTime + Betcaster(i_betcaster).getEmergencyCancelCooldown()) {
+            revert BetManagementEngine__StillInCooldown();
+        }
+        bet.status = BetTypes.Status.CANCELLED;
+        emit BetCancelled(_betNumber, msg.sender, bet);
+        Betcaster(i_betcaster).updateBetStatus(_betNumber, BetTypes.Status.CANCELLED);
+        Betcaster(i_betcaster).transferTokensToUser(bet.maker, bet.betTokenAddress, bet.betAmount);
+        Betcaster(i_betcaster).transferTokensToUser(bet.taker, bet.betTokenAddress, bet.betAmount);
+    }
+
+    /**
      * @notice Gets the Betcaster contract address
      * @return The address of the Betcaster contract
      */

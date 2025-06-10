@@ -34,6 +34,7 @@ contract Betcaster is Ownable {
     mapping(uint256 => BetTypes.Bet) private s_allBets;
     address private s_betManagementEngine;
     address private s_arbiterManagementEngine;
+    uint256 private s_emergencyCancelCooldown;
 
     // Events
     event BetManagementEngineSet(address indexed betManagementEngine);
@@ -75,6 +76,10 @@ contract Betcaster is Ownable {
 
     function setProtocolFee(uint256 _protocolFee) public onlyOwner {
         s_prtocolFee = _protocolFee;
+    }
+
+    function setEmergencyCancelCooldown(uint256 _emergencyCancelCooldown) public onlyOwner {
+        s_emergencyCancelCooldown = _emergencyCancelCooldown;
     }
 
     function increaseBetNumber() public onlyBetManagementEngine returns (uint256) {
@@ -143,6 +148,10 @@ contract Betcaster is Ownable {
 
     function getBetManagementEngine() public view returns (address) {
         return s_betManagementEngine;
+    }
+
+    function getEmergencyCancelCooldown() public view returns (uint256) {
+        return s_emergencyCancelCooldown;
     }
 
     function calculateArbiterPayment(uint256 _betAmount, uint256 _arbiterFee) public pure returns (uint256) {
