@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Test, console} from "forge-std/Test.sol";
+import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {Betcaster} from "../src/betcaster.sol";
 import {BetManagementEngine} from "../src/betManagementEngine.sol";
 import {ERC20Mock} from "lib/openzeppelin-contracts/contracts/mocks/token/ERC20Mock.sol";
@@ -61,6 +62,21 @@ contract BetcasterTest is Test {
         mockToken.approve(address(betcaster), type(uint256).max);
     }
 
+    function _setupBet() public {
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, block.timestamp + 1 days, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(1);
+
+        vm.warp(block.timestamp + 1 days);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR TESTS
     //////////////////////////////////////////////////////////////*/
@@ -71,6 +87,89 @@ contract BetcasterTest is Test {
 
     function testConstructorInitializesBetNumberToZero() public view {
         assertEq(betcaster.getCurrentBetNumber(), 0);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            ACCESS TESTS
+    //////////////////////////////////////////////////////////////*/
+    function testOnlyOwnerAccessControl() public {
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1));
+        vm.prank(user1);
+        betcaster.setBetManagementEngine(address(betManagementEngine));
+
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1));
+        vm.prank(user1);
+        betcaster.setArbiterManagementEngine(address(betManagementEngine));
+
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1));
+        vm.prank(user1);
+        betcaster.setProtocolFee(100);
+
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1));
+        vm.prank(user1);
+        betcaster.setEmergencyCancelCooldown(100);
+    }
+
+    function testOnlyBetManagementEngineAccessControl() public {
+        vm.expectRevert(Betcaster.Betcaster__NotBetManagementEngine.selector);
+        vm.prank(user1);
+        betcaster.increaseBetNumber();
+
+        vm.expectRevert(Betcaster.Betcaster__NotBetManagementEngine.selector);
+        vm.prank(user1);
+        betcaster.createBet(
+            1,
+            BetTypes.Bet({
+                maker: maker,
+                taker: taker,
+                arbiter: arbiter,
+                betTokenAddress: address(mockToken),
+                betAmount: BET_AMOUNT,
+                timestamp: block.timestamp,
+                endTime: block.timestamp + 1 days,
+                status: BetTypes.Status.WAITING_FOR_TAKER,
+                arbiterFee: ARBITER_FEE,
+                betAgreement: BET_AGREEMENT
+            })
+        );
+
+        _setupBet();
+
+        vm.expectRevert(Betcaster.Betcaster__NotBetManagementEngine.selector);
+        vm.prank(user1);
+        betcaster.updateBetStatus(1, BetTypes.Status.WAITING_FOR_TAKER);
+
+        vm.expectRevert(Betcaster.Betcaster__NotBetManagementEngine.selector);
+        vm.prank(user1);
+        betcaster.updateBetTaker(1, taker);
+
+        vm.expectRevert(Betcaster.Betcaster__NotBetManagementEngine.selector);
+        vm.prank(user1);
+        betcaster.setBetArbiterFeeToZero(1);
+
+        vm.expectRevert(Betcaster.Betcaster__NotBetManagementEngine.selector);
+        vm.prank(user1);
+        betcaster.transferTokensToUser(maker, address(mockToken), BET_AMOUNT);
+
+        vm.expectRevert(Betcaster.Betcaster__NotBetManagementEngine.selector);
+        vm.prank(user1);
+        betcaster.depositToBetcaster(maker, address(mockToken), BET_AMOUNT);
+    }
+
+    function testOnlyArbiterManagementEngineAccessControl() public {
+        _setupBet();
+
+        vm.expectRevert(Betcaster.Betcaster__NotArbiterManagementEngine.selector);
+        vm.prank(user1);
+        betcaster.updateBetArbiter(1, arbiter);
+
+        vm.expectRevert(Betcaster.Betcaster__NotArbiterManagementEngine.selector);
+        vm.prank(user1);
+        betcaster.arbiterUpdateBetStatus(1, BetTypes.Status.WAITING_FOR_TAKER);
+
+        vm.expectRevert(Betcaster.Betcaster__NotArbiterManagementEngine.selector);
+        vm.prank(user1);
+        betcaster.transferTokensToArbiter(1, arbiter, address(mockToken));
     }
 
     ///////////////////////////////////////////////////////////////
