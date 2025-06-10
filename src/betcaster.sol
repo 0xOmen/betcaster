@@ -114,11 +114,11 @@ contract Betcaster is Ownable {
         ERC20(_betTokenAddress).transferFrom(_user, address(this), _betAmount);
     }
 
-    function transferTokensToArbiter(uint256 _betAmount, address _arbiter, address _betTokenAddress)
+    function transferTokensToArbiter(uint256 _amount, address _arbiter, address _betTokenAddress)
         public
         onlyArbiterManagementEngine
     {
-        ERC20(_betTokenAddress).transfer(_arbiter, _betAmount);
+        ERC20(_betTokenAddress).transfer(_arbiter, _amount);
     }
 
     // internal
@@ -135,5 +135,13 @@ contract Betcaster is Ownable {
 
     function getBetManagementEngine() public view returns (address) {
         return s_betManagementEngine;
+    }
+
+    function calculateArbiterPayment(uint256 _betAmount, uint256 _arbiterFee) public pure returns (uint256) {
+        return _betAmount * _arbiterFee / 10000;
+    }
+
+    function calculateProtocolRake(uint256 _betAmount) public view returns (uint256) {
+        return _betAmount * s_prtocolFee / 10000;
     }
 }

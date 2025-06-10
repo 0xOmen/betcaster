@@ -56,7 +56,7 @@ contract ArbiterManagementEngine is Ownable {
         } else {
             revert ArbiterManagementEngine__WinnerNotValid();
         }
-        uint256 arbiterFee = (bet.betAmount * 2) * bet.arbiterFee / 10000;
-        Betcaster(s_betcaster).transferTokensToArbiter(arbiterFee, bet.arbiter, bet.betTokenAddress);
+        uint256 arbiterPayment = Betcaster(s_betcaster).calculateArbiterPayment(2 * bet.betAmount, bet.arbiterFee);
+        Betcaster(s_betcaster).transferTokensToArbiter(arbiterPayment, bet.arbiter, bet.betTokenAddress);
     }
 }

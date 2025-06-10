@@ -25,6 +25,8 @@ contract BetManagementEngine is Ownable {
     error BetManagementEngine__StillInCooldown();
     error BetManagementEngine__NotTaker();
     error BetManagementEngine__BetNotInProcess();
+    error BetManagementEngine__BetNotClaimable();
+    error BetManagementEngine__BetAmountMismatch();
 
     address immutable i_betcaster;
 
@@ -32,11 +34,12 @@ contract BetManagementEngine is Ownable {
     event BetCreated(uint256 indexed betNumber, BetTypes.Bet indexed bet);
     event BetCancelled(uint256 indexed betNumber, address indexed calledBy, BetTypes.Bet indexed bet);
     event BetAccepted(uint256 indexed betNumber, BetTypes.Bet indexed bet);
+    event BetClaimed(uint256 indexed betNumber, address indexed winner, BetTypes.Status indexed status);
+
     /**
      * @notice Constructor for BetManagementEngine
      * @param _betcaster The address of the Betcaster contract
      */
-
     constructor(address _betcaster) Ownable(msg.sender) {
         i_betcaster = _betcaster;
     }
@@ -130,6 +133,31 @@ contract BetManagementEngine is Ownable {
 
         Betcaster(i_betcaster).transferTokensToUser(bet.maker, bet.betTokenAddress, bet.betAmount);
         Betcaster(i_betcaster).transferTokensToUser(bet.taker, bet.betTokenAddress, bet.betAmount);
+    }
+
+    function claimBet(uint256 _betNumber) public {
+        BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
+        address winner;
+        uint256 protocolRake = Betcaster(i_betcaster).calculateProtocolRake(2 * bet.betAmount);
+        uint256 arbiterPayment = Betcaster(i_betcaster).calculateArbiterPayment(2 * bet.betAmount, bet.arbiterFee);
+        uint256 winnerTake = 2 * bet.betAmount - protocolRake - arbiterPayment;
+        if (protocolRake + arbiterPayment + winnerTake > 2 * bet.betAmount) {
+            revert BetManagementEngine__BetAmountMismatch();
+        }
+        if (bet.status == BetTypes.Status.MAKER_WINS) {
+            winner = bet.maker;
+            bet.status = BetTypes.Status.COMPLETED_MAKER_WINS;
+        } else if (bet.status == BetTypes.Status.TAKER_WINS) {
+            winner = bet.taker;
+            bet.status = BetTypes.Status.COMPLETED_TAKER_WINS;
+        } else {
+            revert BetManagementEngine__BetNotClaimable();
+        }
+        emit BetClaimed(_betNumber, winner, bet.status);
+        Betcaster(i_betcaster).updateBetStatus(_betNumber, bet.status);
+        Betcaster(i_betcaster).transferTokensToUser(winner, bet.betTokenAddress, winnerTake);
+        //transfer protocol rake to owner
+        Betcaster(i_betcaster).transferTokensToUser(owner(), bet.betTokenAddress, protocolRake);
     }
 
     /**
