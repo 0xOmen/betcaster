@@ -73,6 +73,10 @@ contract Betcaster is Ownable {
         emit ArbiterManagementEngineSet(_arbiterManagementEngine);
     }
 
+    function setProtocolFee(uint256 _protocolFee) public onlyOwner {
+        s_prtocolFee = _protocolFee;
+    }
+
     function increaseBetNumber() public onlyBetManagementEngine returns (uint256) {
         s_betNumber++;
         return s_betNumber;

@@ -23,9 +23,9 @@ contract BetManagementEngineTest is Test {
     address public user2 = makeAddr("user2");
 
     // Test constants
-    uint256 public constant PROTOCOL_FEE = 100; // 1%
+    uint256 public constant PROTOCOL_FEE = 50; //0.5%
     uint256 public constant BET_AMOUNT = 1000e18;
-    uint256 public constant ARBITER_FEE = 50; // 0.5%
+    uint256 public constant ARBITER_FEE = 100; // 1%
     uint256 public constant INITIAL_TOKEN_SUPPLY = 1000000e18;
     string public constant BET_AGREEMENT = "Team A will win the match";
 
@@ -34,6 +34,7 @@ contract BetManagementEngineTest is Test {
     event BetCancelled(uint256 indexed betNumber, address indexed calledBy, BetTypes.Bet indexed bet);
     event BetAccepted(uint256 indexed betNumber, BetTypes.Bet indexed bet);
     event Transfer(address indexed from, address indexed to, uint256 value);
+    event BetClaimed(uint256 indexed betNumber, address indexed winner, BetTypes.Status indexed status);
 
     function setUp() public {
         // Deploy contracts
@@ -544,5 +545,377 @@ contract BetManagementEngineTest is Test {
         // Verify states
         assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.CANCELLED));
         assertEq(uint256(betcaster.getBet(2).status), uint256(BetTypes.Status.WAITING_FOR_ARBITER));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            CLAIM BET TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    // Helper function to set up a bet ready for claiming (maker wins)
+    function _setupBetForClaimingMakerWins() internal returns (uint256 betNumber) {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        // Accept bet
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        // Arbiter accepts role
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(1);
+
+        // Warp to after end time
+        vm.warp(block.timestamp + 2 days);
+
+        // Arbiter selects maker as winner
+        vm.prank(arbiter);
+        arbiterManagementEngine.selectWinner(1, maker);
+
+        return 1;
+    }
+
+    // Helper function to set up a bet ready for claiming (taker wins)
+    function _setupBetForClaimingTakerWins() internal returns (uint256 betNumber) {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        // Accept bet
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        // Arbiter accepts role
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(1);
+
+        // Warp to after end time
+        vm.warp(block.timestamp + 2 days);
+
+        // Arbiter selects taker as winner
+        vm.prank(arbiter);
+        arbiterManagementEngine.selectWinner(1, taker);
+
+        return 1;
+    }
+
+    function testClaimBet_MakerWins() public {
+        _setupBetForClaimingMakerWins();
+
+        uint256 totalBetAmount = BET_AMOUNT * 2;
+        uint256 expectedProtocolRake = totalBetAmount * PROTOCOL_FEE / 10000;
+        uint256 expectedArbiterPayment = totalBetAmount * ARBITER_FEE / 10000;
+        uint256 expectedWinnerTake = totalBetAmount - expectedProtocolRake - expectedArbiterPayment;
+
+        uint256 makerBalanceBefore = mockToken.balanceOf(maker);
+        uint256 ownerBalanceBefore = mockToken.balanceOf(betManagementEngine.owner());
+        uint256 contractBalanceBefore = mockToken.balanceOf(address(betcaster));
+
+        // Expect BetClaimed event
+        vm.expectEmit(true, true, true, false);
+        emit BetClaimed(1, maker, BetTypes.Status.COMPLETED_MAKER_WINS);
+
+        // Anyone can claim the bet
+        vm.prank(user1);
+        betManagementEngine.claimBet(1);
+
+        // Verify bet status changed
+        assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.COMPLETED_MAKER_WINS));
+
+        // Verify token transfers
+        assertEq(mockToken.balanceOf(maker), makerBalanceBefore + expectedWinnerTake);
+        assertEq(mockToken.balanceOf(betManagementEngine.owner()), ownerBalanceBefore + expectedProtocolRake);
+
+        // Contract should have less tokens (winner take + protocol rake transferred out)
+        // Note: Arbiter fee was already transferred when selectWinner was called
+        assertEq(
+            mockToken.balanceOf(address(betcaster)), contractBalanceBefore - expectedWinnerTake - expectedProtocolRake
+        );
+    }
+
+    function testClaimBet_TakerWins() public {
+        _setupBetForClaimingTakerWins();
+
+        uint256 totalBetAmount = BET_AMOUNT * 2;
+        uint256 expectedProtocolRake = totalBetAmount * PROTOCOL_FEE / 10000;
+        uint256 expectedArbiterPayment = totalBetAmount * ARBITER_FEE / 10000;
+        uint256 expectedWinnerTake = totalBetAmount - expectedProtocolRake - expectedArbiterPayment;
+
+        uint256 takerBalanceBefore = mockToken.balanceOf(taker);
+        uint256 ownerBalanceBefore = mockToken.balanceOf(betManagementEngine.owner());
+        uint256 contractBalanceBefore = mockToken.balanceOf(address(betcaster));
+
+        // Expect BetClaimed event
+        vm.expectEmit(true, true, true, false);
+        emit BetClaimed(1, taker, BetTypes.Status.COMPLETED_TAKER_WINS);
+
+        // Winner can claim their own bet
+        vm.prank(taker);
+        betManagementEngine.claimBet(1);
+
+        // Verify bet status changed
+        assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.COMPLETED_TAKER_WINS));
+
+        // Verify token transfers
+        assertEq(mockToken.balanceOf(taker), takerBalanceBefore + expectedWinnerTake);
+        assertEq(mockToken.balanceOf(betManagementEngine.owner()), ownerBalanceBefore + expectedProtocolRake);
+        assertEq(
+            mockToken.balanceOf(address(betcaster)), contractBalanceBefore - expectedWinnerTake - expectedProtocolRake
+        );
+    }
+
+    function testClaimBet_RevertWhen_BetNotClaimable() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Try to claim bet that does not exist
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__BetNotClaimable.selector);
+        vm.prank(user1);
+        betManagementEngine.claimBet(99);
+
+        // Create bet but don't complete it
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        // Try to claim bet that's still WAITING_FOR_TAKER
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__BetNotClaimable.selector);
+        vm.prank(user1);
+        betManagementEngine.claimBet(1);
+    }
+
+    function testClaimBet_RevertWhen_BetInProcess() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create and accept bet
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(1);
+
+        // Try to claim bet that's still IN_PROCESS
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__BetNotClaimable.selector);
+        vm.prank(user1);
+        betManagementEngine.claimBet(1);
+    }
+
+    function testClaimBet_RevertWhen_AlreadyClaimed() public {
+        _setupBetForClaimingMakerWins();
+
+        // Claim bet once
+        vm.prank(user1);
+        betManagementEngine.claimBet(1);
+
+        // Try to claim again
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__BetNotClaimable.selector);
+        vm.prank(user2);
+        betManagementEngine.claimBet(1);
+    }
+
+    function testClaimBet_CanBeCalledByAnyone() public {
+        _setupBetForClaimingMakerWins();
+
+        uint256 totalBetAmount = BET_AMOUNT * 2;
+        uint256 expectedWinnerTake =
+            totalBetAmount - (totalBetAmount * PROTOCOL_FEE / 10000) - (totalBetAmount * ARBITER_FEE / 10000);
+
+        // Random user can trigger bet claim
+        vm.prank(user2);
+        betManagementEngine.claimBet(1);
+
+        // Verify maker received winnings
+        assertEq(mockToken.balanceOf(maker), INITIAL_TOKEN_SUPPLY - BET_AMOUNT + expectedWinnerTake);
+        assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.COMPLETED_MAKER_WINS));
+        // Verity taker received nothing
+        assertEq(mockToken.balanceOf(taker), INITIAL_TOKEN_SUPPLY - BET_AMOUNT);
+    }
+
+    function testClaimBet_WithZeroProtocolFee() public {
+        // Set protocol fee to 0
+        vm.prank(betcaster.owner());
+        betcaster.setProtocolFee(0);
+
+        _setupBetForClaimingMakerWins();
+
+        uint256 totalBetAmount = BET_AMOUNT * 2;
+        uint256 expectedArbiterPayment = totalBetAmount * ARBITER_FEE / 10000;
+        uint256 expectedWinnerTake = totalBetAmount - expectedArbiterPayment; // No protocol fee
+
+        uint256 makerBalanceBefore = mockToken.balanceOf(maker);
+        uint256 ownerBalanceBefore = mockToken.balanceOf(betManagementEngine.owner());
+
+        // Claim bet
+        vm.prank(maker);
+        betManagementEngine.claimBet(1);
+
+        // Verify no protocol fee was taken
+        assertEq(mockToken.balanceOf(maker), makerBalanceBefore + expectedWinnerTake);
+        assertEq(mockToken.balanceOf(betManagementEngine.owner()), ownerBalanceBefore); // No change
+    }
+
+    function testClaimBet_WithZeroArbiterFee() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet with zero arbiter fee
+        vm.prank(maker);
+        betManagementEngine.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, 0, BET_AGREEMENT);
+
+        // Complete the bet flow
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(1);
+
+        vm.warp(block.timestamp + 2 days);
+
+        vm.prank(arbiter);
+        arbiterManagementEngine.selectWinner(1, maker);
+
+        uint256 totalBetAmount = BET_AMOUNT * 2;
+        uint256 expectedProtocolRake = totalBetAmount * PROTOCOL_FEE / 10000;
+        uint256 expectedWinnerTake = totalBetAmount - expectedProtocolRake; // No arbiter fee
+
+        uint256 makerBalanceBefore = mockToken.balanceOf(maker);
+        uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter);
+
+        // Claim bet
+        vm.prank(user1);
+        betManagementEngine.claimBet(1);
+
+        // Verify no arbiter fee was deducted from winner take
+        assertEq(mockToken.balanceOf(maker), makerBalanceBefore + expectedWinnerTake);
+        // Arbiter should have received 0 additional tokens during selectWinner
+        assertEq(mockToken.balanceOf(arbiter), arbiterBalanceBefore);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        CLAIM BET FUZZ TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testFuzz_ClaimBet_CalculationAccuracy(
+        uint256 betAmount,
+        uint256 protocolFeePercent,
+        uint256 arbiterFeePercent
+    ) public {
+        // Bound inputs to reasonable ranges
+        betAmount = bound(betAmount, 1e18, 100000e18); // 1 to 100K tokens
+        protocolFeePercent = bound(protocolFeePercent, 0, 500); // 0% to 5%
+        arbiterFeePercent = bound(arbiterFeePercent, 0, 1000); // 0% to 10%
+
+        // Ensure total fees don't exceed 100%
+        vm.assume(protocolFeePercent + arbiterFeePercent <= 10000);
+
+        vm.prank(betcaster.owner());
+        betcaster.setProtocolFee(protocolFeePercent);
+
+        // Mint sufficient tokens
+        mockToken.mint(maker, betAmount * 2);
+        mockToken.mint(taker, betAmount * 2);
+
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet with fuzzed parameters
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), betAmount, endTime, arbiterFeePercent, BET_AGREEMENT
+        );
+
+        // Complete bet flow
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(1);
+
+        vm.warp(block.timestamp + 2 days);
+
+        vm.prank(arbiter);
+        arbiterManagementEngine.selectWinner(1, maker);
+
+        // Calculate expected amounts
+        uint256 totalBetAmount = betAmount * 2;
+        uint256 expectedProtocolRake = totalBetAmount * protocolFeePercent / 10000;
+        uint256 expectedArbiterPayment = totalBetAmount * arbiterFeePercent / 10000;
+        uint256 expectedWinnerTake = totalBetAmount - expectedProtocolRake - expectedArbiterPayment;
+
+        uint256 makerBalanceBefore = mockToken.balanceOf(maker);
+        uint256 ownerBalanceBefore = mockToken.balanceOf(betManagementEngine.owner());
+
+        // Claim bet
+        vm.prank(arbiter);
+        betManagementEngine.claimBet(1);
+
+        // Verify calculations
+        assertEq(mockToken.balanceOf(maker), makerBalanceBefore + expectedWinnerTake);
+        assertEq(mockToken.balanceOf(betManagementEngine.owner()), ownerBalanceBefore + expectedProtocolRake);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    CLAIM BET INTEGRATION TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testClaimBet_FullBetLifecycle() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Track initial balances
+        uint256 makerInitialBalance = mockToken.balanceOf(maker);
+        uint256 takerInitialBalance = mockToken.balanceOf(taker);
+        uint256 arbiterInitialBalance = mockToken.balanceOf(arbiter);
+        uint256 ownerInitialBalance = mockToken.balanceOf(betManagementEngine.owner());
+
+        // 1. Create bet
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        // 2. Accept bet
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        // 3. Arbiter accepts role
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(1);
+
+        // 4. Time passes
+        vm.warp(block.timestamp + 2 days);
+
+        // 5. Arbiter selects winner
+        vm.prank(arbiter);
+        arbiterManagementEngine.selectWinner(1, maker);
+
+        // 6. Claim bet
+        vm.prank(user1);
+        betManagementEngine.claimBet(1);
+
+        // Calculate expected final balances
+        uint256 totalBetAmount = BET_AMOUNT * 2;
+        uint256 protocolRake = totalBetAmount * PROTOCOL_FEE / 10000;
+        uint256 arbiterPayment = totalBetAmount * ARBITER_FEE / 10000;
+        uint256 winnerTake = totalBetAmount - protocolRake - arbiterPayment;
+
+        // Verify final balances
+        assertEq(mockToken.balanceOf(maker), makerInitialBalance - BET_AMOUNT + winnerTake);
+        assertEq(mockToken.balanceOf(taker), takerInitialBalance - BET_AMOUNT);
+        assertEq(mockToken.balanceOf(arbiter), arbiterInitialBalance + arbiterPayment);
+        assertEq(mockToken.balanceOf(betManagementEngine.owner()), ownerInitialBalance + protocolRake);
+
+        // Verify bet status
+        assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.COMPLETED_MAKER_WINS));
     }
 }
