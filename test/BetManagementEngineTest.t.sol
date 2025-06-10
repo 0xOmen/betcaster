@@ -1325,4 +1325,521 @@ contract BetManagementEngineTest is Test {
         assertEq(betcaster.getBet(1).arbiterFee, 0);
         assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.TAKER_WINS));
     }
+
+    /*//////////////////////////////////////////////////////////////
+                      EMERGENCY CANCEL BET TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    // Helper function to set up a bet ready for emergency cancellation
+    function _setupBetForEmergencyCancel() internal returns (uint256 betNumber) {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        // Accept bet
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        // Arbiter accepts role (bet becomes IN_PROCESS)
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(1);
+
+        return 1;
+    }
+
+    function testEmergencyCancel_SuccessByMaker() public {
+        // Set emergency cancel cooldown to 1 hour
+        vm.prank(betcaster.owner());
+        betcaster.setEmergencyCancelCooldown(1 hours);
+
+        _setupBetForEmergencyCancel();
+
+        // Warp past bet end time + cooldown
+        vm.warp(block.timestamp + 1 days + 1 hours + 1 minutes);
+
+        uint256 makerBalanceBefore = mockToken.balanceOf(maker);
+        uint256 takerBalanceBefore = mockToken.balanceOf(taker);
+        uint256 contractBalanceBefore = mockToken.balanceOf(address(betcaster));
+
+        // Expect BetCancelled event
+        vm.expectEmit(true, true, false, false);
+        emit BetCancelled(1, maker, betcaster.getBet(1));
+
+        // Emergency cancel by maker
+        vm.prank(maker);
+        betManagementEngine.emergencyCancel(1);
+
+        // Verify bet status changed to CANCELLED
+        assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.CANCELLED));
+
+        // Verify tokens returned to both parties
+        assertEq(mockToken.balanceOf(maker), makerBalanceBefore + BET_AMOUNT);
+        assertEq(mockToken.balanceOf(taker), takerBalanceBefore + BET_AMOUNT);
+        assertEq(mockToken.balanceOf(address(betcaster)), contractBalanceBefore - (BET_AMOUNT * 2));
+    }
+
+    function testEmergencyCancel_SuccessByTaker() public {
+        _setupBetForEmergencyCancel();
+
+        // Warp past bet end time + cooldown
+        vm.warp(block.timestamp + 30 days + 2 hours + 1 minutes);
+
+        uint256 makerBalanceBefore = mockToken.balanceOf(maker);
+        uint256 takerBalanceBefore = mockToken.balanceOf(taker);
+        uint256 contractBalanceBefore = mockToken.balanceOf(address(betcaster));
+
+        // Expect BetCancelled event
+        vm.expectEmit(true, true, false, false);
+        emit BetCancelled(1, taker, betcaster.getBet(1));
+
+        // Emergency cancel by taker
+        vm.prank(taker);
+        betManagementEngine.emergencyCancel(1);
+
+        // Verify bet status changed to CANCELLED
+        assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.CANCELLED));
+
+        // Verify tokens returned to both parties
+        assertEq(mockToken.balanceOf(maker), makerBalanceBefore + BET_AMOUNT);
+        assertEq(mockToken.balanceOf(taker), takerBalanceBefore + BET_AMOUNT);
+        assertEq(mockToken.balanceOf(address(betcaster)), contractBalanceBefore - (BET_AMOUNT * 2));
+    }
+
+    function testEmergencyCancel_RevertWhen_BetNotInProcess() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Set emergency cancel cooldown
+        vm.prank(betcaster.owner());
+        betcaster.setEmergencyCancelCooldown(1 hours);
+
+        // Create bet but don't put it in process
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        // Warp past cooldown period
+        vm.warp(block.timestamp + 1 days + 1 hours + 1 minutes);
+
+        // Try to emergency cancel bet that's still WAITING_FOR_TAKER
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__BetNotInProcess.selector);
+        vm.prank(maker);
+        betManagementEngine.emergencyCancel(1);
+    }
+
+    function testEmergencyCancel_RevertWhen_BetWaitingForArbiter() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Set emergency cancel cooldown
+        vm.prank(betcaster.owner());
+        betcaster.setEmergencyCancelCooldown(1 hours);
+
+        // Create and accept bet but don't have arbiter accept
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        // Warp past cooldown period
+        vm.warp(block.timestamp + 1 days + 1 hours + 1 minutes);
+
+        // Try to emergency cancel bet that's WAITING_FOR_ARBITER
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__BetNotInProcess.selector);
+        vm.prank(maker);
+        betManagementEngine.emergencyCancel(1);
+    }
+
+    function testEmergencyCancel_RevertWhen_NotMakerOrTaker() public {
+        // Set emergency cancel cooldown
+        vm.prank(betcaster.owner());
+        betcaster.setEmergencyCancelCooldown(1 hours);
+
+        _setupBetForEmergencyCancel();
+
+        // Warp past cooldown period
+        vm.warp(block.timestamp + 1 days + 1 hours + 1 minutes);
+
+        // Try to emergency cancel as unauthorized user
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__NotMakerOrTaker.selector);
+        vm.prank(user1);
+        betManagementEngine.emergencyCancel(1);
+
+        // Try to emergency cancel as arbiter
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__NotMakerOrTaker.selector);
+        vm.prank(arbiter);
+        betManagementEngine.emergencyCancel(1);
+    }
+
+    function testEmergencyCancel_RevertWhen_StillInCooldown() public {
+        // Set emergency cancel cooldown to 2 hours
+        vm.prank(betcaster.owner());
+        betcaster.setEmergencyCancelCooldown(2 hours);
+
+        _setupBetForEmergencyCancel();
+
+        // Warp to just before cooldown expires
+        vm.warp(block.timestamp + 1 days + 2 hours - 1 minutes);
+
+        // Try to emergency cancel while still in cooldown
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__StillInCooldown.selector);
+        vm.prank(maker);
+        betManagementEngine.emergencyCancel(1);
+    }
+
+    function testEmergencyCancel_RevertWhen_BetEndTimeNotReached() public {
+        // Set emergency cancel cooldown to 1 hour
+        vm.prank(betcaster.owner());
+        betcaster.setEmergencyCancelCooldown(1 hours);
+
+        _setupBetForEmergencyCancel();
+
+        // Try to emergency cancel before bet end time
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__StillInCooldown.selector);
+        vm.prank(maker);
+        betManagementEngine.emergencyCancel(1);
+    }
+
+    function testEmergencyCancel_WithZeroCooldown() public {
+        // Set emergency cancel cooldown to 0
+        vm.prank(betcaster.owner());
+        betcaster.setEmergencyCancelCooldown(0);
+
+        _setupBetForEmergencyCancel();
+
+        // Warp to exactly bet end time (no additional cooldown)
+        vm.warp(block.timestamp + 1 days);
+
+        uint256 makerBalanceBefore = mockToken.balanceOf(maker);
+        uint256 takerBalanceBefore = mockToken.balanceOf(taker);
+
+        // Emergency cancel should work immediately after bet end time
+        vm.prank(maker);
+        betManagementEngine.emergencyCancel(1);
+
+        // Verify success
+        assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.CANCELLED));
+        assertEq(mockToken.balanceOf(maker), makerBalanceBefore + BET_AMOUNT);
+        assertEq(mockToken.balanceOf(taker), takerBalanceBefore + BET_AMOUNT);
+    }
+
+    function testEmergencyCancel_WithLongCooldown() public {
+        // Set emergency cancel cooldown to 7 days
+        vm.prank(betcaster.owner());
+        betcaster.setEmergencyCancelCooldown(7 days);
+
+        _setupBetForEmergencyCancel();
+
+        // Warp to just before long cooldown expires
+        vm.warp(block.timestamp + 1 days + 7 days - 1 minutes);
+
+        // Should still revert
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__StillInCooldown.selector);
+        vm.prank(maker);
+        betManagementEngine.emergencyCancel(1);
+
+        // Warp past long cooldown
+        vm.warp(block.timestamp + 2 minutes);
+
+        // Should now succeed
+        vm.prank(maker);
+        betManagementEngine.emergencyCancel(1);
+
+        assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.CANCELLED));
+    }
+
+    function testEmergencyCancel_RevertWhen_BetAlreadyCompleted() public {
+        // Set emergency cancel cooldown
+        vm.prank(betcaster.owner());
+        betcaster.setEmergencyCancelCooldown(1 hours);
+
+        _setupBetForEmergencyCancel();
+
+        // Complete the bet normally first
+        vm.warp(block.timestamp + 1 days + 1 minutes);
+        vm.prank(arbiter);
+        arbiterManagementEngine.selectWinner(1, maker);
+
+        // Warp past cooldown period
+        vm.warp(block.timestamp + 1 hours + 1 minutes);
+
+        // Try to emergency cancel already completed bet
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__BetNotInProcess.selector);
+        vm.prank(maker);
+        betManagementEngine.emergencyCancel(1);
+    }
+
+    function testEmergencyCancel_RevertWhen_BetAlreadyForfeited() public {
+        // Set emergency cancel cooldown
+        vm.prank(betcaster.owner());
+        betcaster.setEmergencyCancelCooldown(1 hours);
+
+        _setupBetForEmergencyCancel();
+
+        // Forfeit the bet first
+        vm.prank(maker);
+        betManagementEngine.forfeitBet(1);
+
+        // Warp past cooldown period
+        vm.warp(block.timestamp + 1 days + 1 hours + 1 minutes);
+
+        // Try to emergency cancel already forfeited bet
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__BetNotInProcess.selector);
+        vm.prank(taker);
+        betManagementEngine.emergencyCancel(1);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                  EMERGENCY CANCEL INTEGRATION TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testEmergencyCancel_FullWorkflow() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Set emergency cancel cooldown
+        vm.prank(betcaster.owner());
+        betcaster.setEmergencyCancelCooldown(1 hours);
+
+        // Track initial balances
+        uint256 makerInitialBalance = mockToken.balanceOf(maker);
+        uint256 takerInitialBalance = mockToken.balanceOf(taker);
+        uint256 arbiterInitialBalance = mockToken.balanceOf(arbiter);
+        uint256 ownerInitialBalance = mockToken.balanceOf(betManagementEngine.owner());
+
+        // 1. Create bet
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        // 2. Accept bet
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        // 3. Arbiter accepts role
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(1);
+
+        // 4. Time passes beyond bet end time + cooldown
+        vm.warp(endTime + 1 hours + 1 minutes);
+
+        // 5. Emergency cancel by taker
+        vm.prank(taker);
+        betManagementEngine.emergencyCancel(1);
+
+        // Verify final balances - both parties get their money back
+        assertEq(mockToken.balanceOf(maker), makerInitialBalance);
+        assertEq(mockToken.balanceOf(taker), takerInitialBalance);
+        assertEq(mockToken.balanceOf(arbiter), arbiterInitialBalance); // No change
+        assertEq(mockToken.balanceOf(betManagementEngine.owner()), ownerInitialBalance); // No change
+
+        // Verify bet status
+        assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.CANCELLED));
+    }
+
+    function testEmergencyCancel_CompareWithNormalCancel() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Set emergency cancel cooldown
+        vm.prank(betcaster.owner());
+        betcaster.setEmergencyCancelCooldown(2 hours);
+
+        // Create two identical bets
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            user2, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        // Accept both bets
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+        vm.prank(user2);
+        betManagementEngine.acceptBet(2);
+
+        // Only first bet gets arbiter
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(1);
+
+        // First bet: emergency cancel (IN_PROCESS)
+        vm.warp(endTime + 2 hours + 1 minutes);
+        vm.prank(maker);
+        betManagementEngine.emergencyCancel(1);
+
+        // Second bet: normal no arbiter cancel (WAITING_FOR_ARBITER)
+        vm.warp(block.timestamp + 1 hours); // Past the 1 hour cooldown for noArbiterCancel
+        vm.prank(maker);
+        betManagementEngine.noArbiterCancelBet(2);
+
+        // Both bets should be cancelled with tokens returned
+        assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.CANCELLED));
+        assertEq(uint256(betcaster.getBet(2).status), uint256(BetTypes.Status.CANCELLED));
+
+        // Both makers should get their tokens back
+        uint256 expectedMakerBalance = INITIAL_TOKEN_SUPPLY; // Back to original balance
+        assertEq(mockToken.balanceOf(maker), expectedMakerBalance);
+    }
+
+    function testEmergencyCancel_EventEmission() public {
+        // Set emergency cancel cooldown
+        vm.prank(betcaster.owner());
+        betcaster.setEmergencyCancelCooldown(1 hours);
+
+        _setupBetForEmergencyCancel();
+
+        // Warp past cooldown
+        vm.warp(block.timestamp + 1 days + 1 hours + 1 minutes);
+
+        BetTypes.Bet memory betBefore = betcaster.getBet(1);
+
+        // Test exact event emission
+        vm.expectEmit(true, true, false, true);
+        emit BetCancelled(1, maker, betBefore);
+
+        vm.prank(maker);
+        betManagementEngine.emergencyCancel(1);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    EMERGENCY CANCEL EDGE CASES
+    //////////////////////////////////////////////////////////////*/
+
+    function testEmergencyCancel_ExactCooldownBoundary() public {
+        // Set emergency cancel cooldown to 1 hour
+        vm.prank(betcaster.owner());
+        betcaster.setEmergencyCancelCooldown(1 hours);
+
+        _setupBetForEmergencyCancel();
+
+        // Warp to exactly when cooldown expires
+        vm.warp(block.timestamp + 1 days + 1 hours);
+
+        // Should succeed at exact boundary
+        vm.prank(maker);
+        betManagementEngine.emergencyCancel(1);
+
+        assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.CANCELLED));
+    }
+
+    function testEmergencyCancel_MultipleAttempts() public {
+        // Set emergency cancel cooldown
+        vm.prank(betcaster.owner());
+        betcaster.setEmergencyCancelCooldown(1 hours);
+
+        _setupBetForEmergencyCancel();
+
+        // Try too early
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__StillInCooldown.selector);
+        vm.prank(maker);
+        betManagementEngine.emergencyCancel(1);
+
+        // Try still too early
+        vm.warp(block.timestamp + 1 days + 30 minutes);
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__StillInCooldown.selector);
+        vm.prank(maker);
+        betManagementEngine.emergencyCancel(1);
+
+        // Finally succeed
+        vm.warp(block.timestamp + 31 minutes);
+        vm.prank(maker);
+        betManagementEngine.emergencyCancel(1);
+
+        // Try again after successful cancel
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__BetNotInProcess.selector);
+        vm.prank(maker);
+        betManagementEngine.emergencyCancel(1);
+
+        assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.CANCELLED));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                  EMERGENCY CANCEL FUZZ TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testFuzz_EmergencyCancel_WithVariousCooldowns(uint256 cooldownHours) public {
+        // Bound cooldown to reasonable range (0 to 30 days)
+        cooldownHours = bound(cooldownHours, 0, 720);
+        uint256 cooldownSeconds = cooldownHours * 1 hours;
+
+        // Set emergency cancel cooldown
+        vm.prank(betcaster.owner());
+        betcaster.setEmergencyCancelCooldown(cooldownSeconds);
+
+        _setupBetForEmergencyCancel();
+
+        // Try to cancel before cooldown expires (should fail if cooldown > 0)
+        if (cooldownSeconds > 0) {
+            vm.warp(block.timestamp + 1 days + cooldownSeconds - 1 minutes);
+            vm.expectRevert(BetManagementEngine.BetManagementEngine__StillInCooldown.selector);
+            vm.prank(maker);
+            betManagementEngine.emergencyCancel(1);
+        }
+
+        // Warp past cooldown and try again (should succeed)
+        vm.warp(block.timestamp + 1 days + cooldownSeconds + 1 minutes);
+
+        uint256 makerBalanceBefore = mockToken.balanceOf(maker);
+        uint256 takerBalanceBefore = mockToken.balanceOf(taker);
+
+        vm.prank(maker);
+        betManagementEngine.emergencyCancel(1);
+
+        // Verify success
+        assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.CANCELLED));
+        assertEq(mockToken.balanceOf(maker), makerBalanceBefore + BET_AMOUNT);
+        assertEq(mockToken.balanceOf(taker), takerBalanceBefore + BET_AMOUNT);
+    }
+
+    function testFuzz_EmergencyCancel_WithVariousBetAmounts(uint256 betAmount) public {
+        // Bound bet amount to reasonable range
+        betAmount = bound(betAmount, 1e18, 100000e18);
+
+        // Set emergency cancel cooldown
+        vm.prank(betcaster.owner());
+        betcaster.setEmergencyCancelCooldown(1 hours);
+
+        // Mint sufficient tokens
+        mockToken.mint(maker, betAmount * 2);
+        mockToken.mint(taker, betAmount * 2);
+
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet with fuzzed amount
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), betAmount, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        // Complete bet setup
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(1);
+
+        // Warp past cooldown
+        vm.warp(endTime + 1 hours + 1 minutes);
+
+        uint256 makerBalanceBefore = mockToken.balanceOf(maker);
+        uint256 takerBalanceBefore = mockToken.balanceOf(taker);
+
+        // Emergency cancel
+        vm.prank(taker);
+        betManagementEngine.emergencyCancel(1);
+
+        // Verify correct amounts returned
+        assertEq(mockToken.balanceOf(maker), makerBalanceBefore + betAmount);
+        assertEq(mockToken.balanceOf(taker), takerBalanceBefore + betAmount);
+        assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.CANCELLED));
+    }
 }
