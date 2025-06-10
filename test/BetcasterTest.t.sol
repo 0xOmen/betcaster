@@ -114,84 +114,40 @@ contract BetcasterTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                        MULTIPLE BETS TESTS
-    //////////////////////////////////////////////////////////////*/
-    /*
-    function testCreateMultipleBets() public {
-        uint256 endTime = block.timestamp + 1 days;
-
-        // Create first bet
-        vm.prank(maker);
-        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, "First bet");
-
-        // Create second bet
-        vm.prank(user1);
-        betcaster.createBet(
-            user2, arbiter, address(mockToken), BET_AMOUNT / 2, endTime + 1 hours, ARBITER_FEE, "Second bet"
-        );
-
-        // Verify both bets exist
-        assertEq(betcaster.getCurrentBetNumber(), 2);
-
-        Betcaster.Bet memory firstBet = betcaster.getBet(1);
-        Betcaster.Bet memory secondBet = betcaster.getBet(2);
-
-        assertEq(firstBet.maker, maker);
-        assertEq(firstBet.betAmount, BET_AMOUNT);
-        assertEq(firstBet.betAgreement, "First bet");
-
-        assertEq(secondBet.maker, user1);
-        assertEq(secondBet.betAmount, BET_AMOUNT / 2);
-        assertEq(secondBet.betAgreement, "Second bet");
-
-        // Verify contract holds both bet amounts
-        assertEq(mockToken.balanceOf(address(betcaster)), BET_AMOUNT + (BET_AMOUNT / 2));
-    }
-
-    function testMultipleBetOperations() public {
-        uint256 endTime = block.timestamp + 1 days;
-
-        // Create multiple bets
-        vm.prank(maker);
-        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, "Bet 1");
-
-        vm.prank(user1);
-        betcaster.createBet(user2, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, "Bet 2");
-
-        // Cancel first bet
-        vm.prank(maker);
-        betcaster.makerCancelBet(1);
-
-        // Accept second bet
-        vm.prank(user2);
-        betcaster.acceptBet(2);
-
-        // Verify states
-        assertEq(uint256(betcaster.getBet(1).status), uint256(Betcaster.Status.CANCELLED));
-        assertEq(uint256(betcaster.getBet(2).status), uint256(Betcaster.Status.WAITING_FOR_ARBITER));
-    }
-    */
-    /*//////////////////////////////////////////////////////////////
                             VIEW FUNCTION TESTS
     //////////////////////////////////////////////////////////////*/
-    /*
+
     function testGetCurrentBetNumber() public {
+        uint256 endTime = block.timestamp + 1 days;
         assertEq(betcaster.getCurrentBetNumber(), 0);
 
-        uint256 endTime = block.timestamp + 1 days;
         vm.prank(maker);
-        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
 
         assertEq(betcaster.getCurrentBetNumber(), 1);
     }
 
     function testGetBetReturnsCorrectData() public {
+        BetTypes.Bet memory bet = BetTypes.Bet({
+            maker: maker,
+            taker: taker,
+            arbiter: arbiter,
+            betTokenAddress: address(mockToken),
+            betAmount: BET_AMOUNT,
+            timestamp: block.timestamp,
+            endTime: block.timestamp + 1 days,
+            status: BetTypes.Status.WAITING_FOR_TAKER,
+            arbiterFee: ARBITER_FEE,
+            betAgreement: BET_AGREEMENT
+        });
         uint256 endTime = block.timestamp + 1 days;
 
-        vm.prank(maker);
-        betcaster.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT);
+        vm.prank(address(betManagementEngine));
+        betcaster.createBet(1, bet);
 
-        Betcaster.Bet memory retrievedBet = betcaster.getBet(1);
+        BetTypes.Bet memory retrievedBet = betcaster.getBet(1);
 
         assertEq(retrievedBet.maker, maker);
         assertEq(retrievedBet.taker, taker);
@@ -199,13 +155,13 @@ contract BetcasterTest is Test {
         assertEq(retrievedBet.betTokenAddress, address(mockToken));
         assertEq(retrievedBet.betAmount, BET_AMOUNT);
         assertEq(retrievedBet.endTime, endTime);
-        assertEq(uint256(retrievedBet.status), uint256(Betcaster.Status.WAITING_FOR_TAKER));
+        assertEq(uint256(retrievedBet.status), uint256(BetTypes.Status.WAITING_FOR_TAKER));
         assertEq(retrievedBet.arbiterFee, ARBITER_FEE);
         assertEq(retrievedBet.betAgreement, BET_AGREEMENT);
     }
 
     function testGetNonExistentBetReturnsEmptyStruct() public view {
-        Betcaster.Bet memory emptyBet = betcaster.getBet(999);
+        BetTypes.Bet memory emptyBet = betcaster.getBet(999);
 
         assertEq(emptyBet.maker, address(0));
         assertEq(emptyBet.taker, address(0));
@@ -218,7 +174,7 @@ contract BetcasterTest is Test {
         assertEq(emptyBet.arbiterFee, 0);
         assertEq(emptyBet.betAgreement, "");
     }
-    */
+
     /*//////////////////////////////////////////////////////////////
                             FUZZ TESTS
     //////////////////////////////////////////////////////////////*/

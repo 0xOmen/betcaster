@@ -485,4 +485,62 @@ contract BetManagementEngineTest is Test {
         vm.expectRevert(BetManagementEngine.BetManagementEngine__NotMakerOrTaker.selector);
         betManagementEngine.noArbiterCancelBet(999);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                        MULTIPLE BETS TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testCreateMultipleBets() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create first bet
+        vm.prank(maker);
+        betManagementEngine.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, "First bet");
+
+        // Create second bet
+        vm.prank(user1);
+        betManagementEngine.createBet(
+            user2, arbiter, address(mockToken), BET_AMOUNT / 2, endTime + 1 hours, ARBITER_FEE, "Second bet"
+        );
+
+        // Verify both bets exist
+        assertEq(betcaster.getCurrentBetNumber(), 2);
+
+        BetTypes.Bet memory firstBet = betcaster.getBet(1);
+        BetTypes.Bet memory secondBet = betcaster.getBet(2);
+
+        assertEq(firstBet.maker, maker);
+        assertEq(firstBet.betAmount, BET_AMOUNT);
+        assertEq(firstBet.betAgreement, "First bet");
+
+        assertEq(secondBet.maker, user1);
+        assertEq(secondBet.betAmount, BET_AMOUNT / 2);
+        assertEq(secondBet.betAgreement, "Second bet");
+
+        // Verify contract holds both bet amounts
+        assertEq(mockToken.balanceOf(address(betcaster)), BET_AMOUNT + (BET_AMOUNT / 2));
+    }
+
+    function testMultipleBetOperations() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create multiple bets
+        vm.prank(maker);
+        betManagementEngine.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, "Bet 1");
+
+        vm.prank(user1);
+        betManagementEngine.createBet(user2, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, "Bet 2");
+
+        // Cancel first bet
+        vm.prank(maker);
+        betManagementEngine.makerCancelBet(1);
+
+        // Accept second bet
+        vm.prank(user2);
+        betManagementEngine.acceptBet(2);
+
+        // Verify states
+        assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.CANCELLED));
+        assertEq(uint256(betcaster.getBet(2).status), uint256(BetTypes.Status.WAITING_FOR_ARBITER));
+    }
 }
