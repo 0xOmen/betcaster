@@ -35,6 +35,7 @@ contract BetManagementEngineTest is Test {
     event BetAccepted(uint256 indexed betNumber, BetTypes.Bet indexed bet);
     event Transfer(address indexed from, address indexed to, uint256 value);
     event BetClaimed(uint256 indexed betNumber, address indexed winner, BetTypes.Status indexed status);
+    event BetForfeited(uint256 indexed betNumber, address indexed calledBy, BetTypes.Bet indexed bet);
 
     function setUp() public {
         // Deploy contracts
@@ -917,5 +918,411 @@ contract BetManagementEngineTest is Test {
 
         // Verify bet status
         assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.COMPLETED_MAKER_WINS));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          FORFEIT BET TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    // Helper function to set up a bet in process (ready for forfeiting)
+    function _setupBetInProcess() internal returns (uint256 betNumber) {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        // Accept bet
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        // Arbiter accepts role
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(1);
+
+        return 1;
+    }
+
+    function testForfeitBet_MakerForfeits() public {
+        _setupBetInProcess();
+
+        // Verify initial state
+        BetTypes.Bet memory betBefore = betcaster.getBet(1);
+        assertEq(uint256(betBefore.status), uint256(BetTypes.Status.IN_PROCESS));
+        assertEq(betBefore.arbiterFee, ARBITER_FEE);
+
+        // Expect BetForfeited event
+        vm.expectEmit(true, true, false, false);
+        emit BetForfeited(1, maker, betBefore);
+
+        // Maker forfeits bet
+        vm.prank(maker);
+        betManagementEngine.forfeitBet(1);
+
+        // Verify bet status changed to TAKER_WINS
+        BetTypes.Bet memory betAfter = betcaster.getBet(1);
+        assertEq(uint256(betAfter.status), uint256(BetTypes.Status.TAKER_WINS));
+        assertEq(betAfter.arbiterFee, 0); // Arbiter fee should be set to zero
+    }
+
+    function testForfeitBet_TakerForfeits() public {
+        _setupBetInProcess();
+
+        // Verify initial state
+        BetTypes.Bet memory betBefore = betcaster.getBet(1);
+        assertEq(uint256(betBefore.status), uint256(BetTypes.Status.IN_PROCESS));
+        assertEq(betBefore.arbiterFee, ARBITER_FEE);
+
+        // Expect BetForfeited event
+        vm.expectEmit(true, true, false, false);
+        emit BetForfeited(1, taker, betBefore);
+
+        // Taker forfeits bet
+        vm.prank(taker);
+        betManagementEngine.forfeitBet(1);
+
+        // Verify bet status changed to MAKER_WINS
+        BetTypes.Bet memory betAfter = betcaster.getBet(1);
+        assertEq(uint256(betAfter.status), uint256(BetTypes.Status.MAKER_WINS));
+        assertEq(betAfter.arbiterFee, 0); // Arbiter fee should be set to zero
+    }
+
+    function testForfeitBet_RevertWhen_BetNotInProcess() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet but don't put it in process
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        // Try to forfeit bet that's still WAITING_FOR_TAKER
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__BetNotInProcess.selector);
+        vm.prank(maker);
+        betManagementEngine.forfeitBet(1);
+    }
+
+    function testForfeitBet_RevertWhen_BetWaitingForArbiter() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create and accept bet but don't have arbiter accept
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        // Try to forfeit bet that's WAITING_FOR_ARBITER
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__BetNotInProcess.selector);
+        vm.prank(maker);
+        betManagementEngine.forfeitBet(1);
+    }
+
+    function testForfeitBet_RevertWhen_NotMakerOrTaker() public {
+        _setupBetInProcess();
+
+        // Try to forfeit as unauthorized user
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__NotMakerOrTaker.selector);
+        vm.prank(user1);
+        betManagementEngine.forfeitBet(1);
+
+        // Try to forfeit as arbiter
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__NotMakerOrTaker.selector);
+        vm.prank(arbiter);
+        betManagementEngine.forfeitBet(1);
+    }
+
+    function testForfeitBet_RevertWhen_BetAlreadyCompleted() public {
+        _setupBetInProcess();
+
+        // Maker forfeits first
+        vm.prank(maker);
+        betManagementEngine.forfeitBet(1);
+
+        // Try to forfeit again when bet is already in TAKER_WINS status
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__BetNotInProcess.selector);
+        vm.prank(taker);
+        betManagementEngine.forfeitBet(1);
+    }
+
+    function testForfeitBet_ArbiterFeeSetToZero() public {
+        _setupBetInProcess();
+
+        // Verify arbiter fee is initially set
+        BetTypes.Bet memory betBefore = betcaster.getBet(1);
+        assertEq(betBefore.arbiterFee, ARBITER_FEE);
+        assertTrue(betBefore.arbiterFee > 0);
+
+        // Forfeit bet
+        vm.prank(maker);
+        betManagementEngine.forfeitBet(1);
+
+        // Verify arbiter fee is now zero
+        BetTypes.Bet memory betAfter = betcaster.getBet(1);
+        assertEq(betAfter.arbiterFee, 0);
+    }
+
+    function testForfeitBet_WithHighArbiterFee() public {
+        uint256 highArbiterFee = 1000; // 10%
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet with high arbiter fee
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, highArbiterFee, BET_AGREEMENT
+        );
+
+        // Complete bet setup
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(1);
+
+        // Verify high arbiter fee is set
+        assertEq(betcaster.getBet(1).arbiterFee, highArbiterFee);
+
+        // Forfeit bet
+        vm.prank(maker);
+        betManagementEngine.forfeitBet(1);
+
+        // Verify arbiter fee is set to zero regardless of initial value
+        assertEq(betcaster.getBet(1).arbiterFee, 0);
+        assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.TAKER_WINS));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    FORFEIT BET INTEGRATION TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testForfeitBet_FullWorkflowMakerForfeits() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Track initial balances
+        uint256 makerInitialBalance = mockToken.balanceOf(maker);
+        uint256 takerInitialBalance = mockToken.balanceOf(taker);
+        uint256 arbiterInitialBalance = mockToken.balanceOf(arbiter);
+        uint256 ownerInitialBalance = mockToken.balanceOf(betManagementEngine.owner());
+
+        // 1. Create bet
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        // 2. Accept bet
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        // 3. Arbiter accepts role
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(1);
+
+        // 4. Maker forfeits
+        vm.prank(maker);
+        betManagementEngine.forfeitBet(1);
+
+        // 5. Claim bet (taker wins)
+        vm.prank(user1);
+        betManagementEngine.claimBet(1);
+
+        // Calculate expected final balances (no arbiter fee since it was forfeited)
+        uint256 totalBetAmount = BET_AMOUNT * 2;
+        uint256 protocolRake = totalBetAmount * PROTOCOL_FEE / 10000;
+        uint256 winnerTake = totalBetAmount - protocolRake; // No arbiter fee
+
+        // Verify final balances
+        assertEq(mockToken.balanceOf(maker), makerInitialBalance - BET_AMOUNT);
+        assertEq(mockToken.balanceOf(taker), takerInitialBalance - BET_AMOUNT + winnerTake);
+        assertEq(mockToken.balanceOf(arbiter), arbiterInitialBalance); // No arbiter fee
+        assertEq(mockToken.balanceOf(betManagementEngine.owner()), ownerInitialBalance + protocolRake);
+
+        // Verify bet status
+        assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.COMPLETED_TAKER_WINS));
+    }
+
+    function testForfeitBet_FullWorkflowTakerForfeits() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Track initial balances
+        uint256 makerInitialBalance = mockToken.balanceOf(maker);
+        uint256 takerInitialBalance = mockToken.balanceOf(taker);
+        uint256 arbiterInitialBalance = mockToken.balanceOf(arbiter);
+        uint256 ownerInitialBalance = mockToken.balanceOf(betManagementEngine.owner());
+
+        // 1. Create bet
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        // 2. Accept bet
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        // 3. Arbiter accepts role
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(1);
+
+        // 4. Taker forfeits
+        vm.prank(taker);
+        betManagementEngine.forfeitBet(1);
+
+        // 5. Claim bet (maker wins)
+        vm.prank(user1);
+        betManagementEngine.claimBet(1);
+
+        // Calculate expected final balances (no arbiter fee since it was forfeited)
+        uint256 totalBetAmount = BET_AMOUNT * 2;
+        uint256 protocolRake = totalBetAmount * PROTOCOL_FEE / 10000;
+        uint256 winnerTake = totalBetAmount - protocolRake; // No arbiter fee
+
+        // Verify final balances
+        assertEq(mockToken.balanceOf(maker), makerInitialBalance - BET_AMOUNT + winnerTake);
+        assertEq(mockToken.balanceOf(taker), takerInitialBalance - BET_AMOUNT);
+        assertEq(mockToken.balanceOf(arbiter), arbiterInitialBalance); // No arbiter fee
+        assertEq(mockToken.balanceOf(betManagementEngine.owner()), ownerInitialBalance + protocolRake);
+
+        // Verify bet status
+        assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.COMPLETED_MAKER_WINS));
+    }
+
+    function testForfeitBet_CompareWithNormalWin() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create two identical bets
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            user2, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        // Set up both bets identically
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+        vm.prank(user2);
+        betManagementEngine.acceptBet(2);
+
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(1);
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(2);
+
+        // First bet: forfeit
+        vm.prank(maker);
+        betManagementEngine.forfeitBet(1);
+
+        // Second bet: normal arbiter decision
+        vm.warp(block.timestamp + 2 days);
+        vm.prank(arbiter);
+        arbiterManagementEngine.selectWinner(2, user2);
+
+        // Compare arbiter fees
+        assertEq(betcaster.getBet(1).arbiterFee, 0); // Forfeited bet has no arbiter fee
+        assertEq(betcaster.getBet(2).arbiterFee, ARBITER_FEE); // Normal bet keeps arbiter fee
+
+        // Claim both bets
+        vm.prank(user1);
+        betManagementEngine.claimBet(1);
+        vm.prank(user1);
+        betManagementEngine.claimBet(2);
+
+        // Verify different payout structures
+        uint256 totalBetAmount = BET_AMOUNT * 2;
+        uint256 protocolRake = totalBetAmount * PROTOCOL_FEE / 10000;
+        uint256 arbiterPayment = totalBetAmount * ARBITER_FEE / 10000;
+
+        // Forfeited bet: winner gets more (no arbiter fee)
+        uint256 forfeitWinnerTake = totalBetAmount - protocolRake;
+        // Normal bet: winner gets less (arbiter fee deducted)
+        uint256 normalWinnerTake = totalBetAmount - protocolRake - arbiterPayment;
+
+        assertTrue(forfeitWinnerTake > normalWinnerTake);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        FORFEIT BET EDGE CASES
+    //////////////////////////////////////////////////////////////*/
+
+    function testForfeitBet_WithZeroArbiterFee() public {
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet with zero arbiter fee
+        vm.prank(maker);
+        betManagementEngine.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, 0, BET_AGREEMENT);
+
+        // Complete bet setup
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(1);
+
+        // Verify arbiter fee is already zero
+        assertEq(betcaster.getBet(1).arbiterFee, 0);
+
+        // Forfeit bet
+        vm.prank(maker);
+        betManagementEngine.forfeitBet(1);
+
+        // Verify arbiter fee remains zero and status changed
+        assertEq(betcaster.getBet(1).arbiterFee, 0);
+        assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.TAKER_WINS));
+    }
+
+    function testForfeitBet_EventEmission() public {
+        _setupBetInProcess();
+
+        BetTypes.Bet memory betBefore = betcaster.getBet(1);
+
+        // Test exact event emission
+        vm.expectEmit(true, true, false, true);
+        emit BetForfeited(1, maker, betBefore);
+
+        vm.prank(maker);
+        betManagementEngine.forfeitBet(1);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                      FORFEIT BET FUZZ TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testFuzz_ForfeitBet_WithVariousArbiterFees(uint256 arbiterFeePercent) public {
+        // Bound arbiter fee to valid range
+        arbiterFeePercent = bound(arbiterFeePercent, 0, 10000); // 0% to 100%
+
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Create bet with fuzzed arbiter fee
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, arbiterFeePercent, BET_AGREEMENT
+        );
+
+        // Complete bet setup
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(1);
+
+        // Verify initial arbiter fee
+        assertEq(betcaster.getBet(1).arbiterFee, arbiterFeePercent);
+
+        // Forfeit bet
+        vm.prank(maker);
+        betManagementEngine.forfeitBet(1);
+
+        // Verify arbiter fee is always set to zero regardless of initial value
+        assertEq(betcaster.getBet(1).arbiterFee, 0);
+        assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.TAKER_WINS));
     }
 }
