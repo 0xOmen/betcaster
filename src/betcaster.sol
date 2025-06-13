@@ -17,6 +17,7 @@ import {BetTypes} from "./BetTypes.sol";
  * @dev This is the main contract that stores the state of every agreement.
  */
 contract Betcaster is Ownable {
+    error Betcaster__ProtocolPaused();
     error Betcaster__NotBetManagementEngine();
     error Betcaster__NotArbiterManagementEngine();
     error Betcaster__BetAmountCannotBeZero();
@@ -24,6 +25,7 @@ contract Betcaster is Ownable {
     error Betcaster__CannotBeZeroAddress();
 
     // State variables
+    bool private s_protocolPaused;
     uint256 public s_prtocolFee;
     uint256 private s_betNumber;
     mapping(uint256 => BetTypes.Bet) private s_allBets;
@@ -37,11 +39,13 @@ contract Betcaster is Ownable {
 
     // Modifiers
     modifier onlyBetManagementEngine() {
+        if (s_protocolPaused) revert Betcaster__ProtocolPaused();
         if (msg.sender != s_betManagementEngine) revert Betcaster__NotBetManagementEngine();
         _;
     }
 
     modifier onlyArbiterManagementEngine() {
+        if (s_protocolPaused) revert Betcaster__ProtocolPaused();
         if (msg.sender != s_arbiterManagementEngine) revert Betcaster__NotArbiterManagementEngine();
         _;
     }
@@ -54,6 +58,7 @@ contract Betcaster is Ownable {
      */
     constructor(uint256 protocolFee) Ownable(msg.sender) {
         s_prtocolFee = protocolFee;
+        s_protocolPaused = false;
     }
 
     // external functions
@@ -69,6 +74,14 @@ contract Betcaster is Ownable {
         if (_arbiterManagementEngine == address(0)) revert Betcaster__CannotBeZeroAddress();
         s_arbiterManagementEngine = _arbiterManagementEngine;
         emit ArbiterManagementEngineSet(_arbiterManagementEngine);
+    }
+
+    function pauseProtocol() public onlyOwner {
+        s_protocolPaused = true;
+    }
+
+    function unpauseProtocol() public onlyOwner {
+        s_protocolPaused = false;
     }
 
     function setProtocolFee(uint256 _protocolFee) public onlyOwner {

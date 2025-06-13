@@ -17,6 +17,7 @@ contract BetcasterTest is Test {
     ERC20Mock public mockToken;
 
     // Test addresses
+    address public owner;
     address public maker = makeAddr("maker");
     address public taker = makeAddr("taker");
     address public arbiter = makeAddr("arbiter");
@@ -41,6 +42,7 @@ contract BetcasterTest is Test {
         address wethTokenAddr;
         (betcaster, betManagementEngine, arbiterManagementEngine, wethTokenAddr) = deployer.run();
         mockToken = new ERC20Mock();
+        owner = betcaster.owner();
 
         // Mint tokens to test addresses
         mockToken.mint(maker, INITIAL_TOKEN_SUPPLY);
@@ -108,6 +110,14 @@ contract BetcasterTest is Test {
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1));
         vm.prank(user1);
         betcaster.setEmergencyCancelCooldown(100);
+
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1));
+        vm.prank(user1);
+        betcaster.pauseProtocol();
+
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1));
+        vm.prank(user1);
+        betcaster.unpauseProtocol();
     }
 
     function testOnlyBetManagementEngineAccessControl() public {
@@ -170,6 +180,97 @@ contract BetcasterTest is Test {
         vm.expectRevert(Betcaster.Betcaster__NotArbiterManagementEngine.selector);
         vm.prank(user1);
         betcaster.transferTokensToArbiter(1, arbiter, address(mockToken));
+    }
+
+    function testProtocolPaused() public {
+        _setupBet();
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, block.timestamp + 1 days, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        vm.prank(owner);
+        betcaster.pauseProtocol();
+
+        vm.expectRevert(Betcaster.Betcaster__ProtocolPaused.selector);
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, block.timestamp + 1 days, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        vm.prank(owner);
+        betcaster.unpauseProtocol();
+
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, block.timestamp + 1 days, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        vm.prank(owner);
+        betcaster.pauseProtocol();
+
+        vm.expectRevert(Betcaster.Betcaster__ProtocolPaused.selector);
+        vm.prank(maker);
+        betManagementEngine.makerCancelBet(2);
+
+        vm.expectRevert(Betcaster.Betcaster__ProtocolPaused.selector);
+        vm.prank(taker);
+        betManagementEngine.acceptBet(2);
+
+        vm.prank(owner);
+        betcaster.unpauseProtocol();
+
+        vm.prank(taker);
+        betManagementEngine.acceptBet(2);
+
+        vm.prank(owner);
+        betcaster.pauseProtocol();
+
+        vm.warp(block.timestamp + 1 hours);
+
+        vm.expectRevert(Betcaster.Betcaster__ProtocolPaused.selector);
+        vm.prank(taker);
+        betManagementEngine.noArbiterCancelBet(2);
+
+        vm.expectRevert(Betcaster.Betcaster__ProtocolPaused.selector);
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(2);
+
+        vm.prank(owner);
+        betcaster.unpauseProtocol();
+
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(2);
+
+        vm.prank(owner);
+        betcaster.pauseProtocol();
+
+        vm.expectRevert(Betcaster.Betcaster__ProtocolPaused.selector);
+        vm.prank(maker);
+        betManagementEngine.forfeitBet(2);
+
+        vm.warp(block.timestamp + 31 days);
+
+        vm.expectRevert(Betcaster.Betcaster__ProtocolPaused.selector);
+        vm.prank(arbiter);
+        arbiterManagementEngine.selectWinner(2, maker);
+
+        vm.expectRevert(Betcaster.Betcaster__ProtocolPaused.selector);
+        vm.prank(maker);
+        betManagementEngine.emergencyCancel(2);
+
+        vm.prank(owner);
+        betcaster.unpauseProtocol();
+
+        vm.prank(arbiter);
+        arbiterManagementEngine.selectWinner(2, maker);
+
+        vm.prank(owner);
+        betcaster.pauseProtocol();
+
+        vm.expectRevert(Betcaster.Betcaster__ProtocolPaused.selector);
+        vm.prank(maker);
+        betManagementEngine.claimBet(2);
     }
 
     ///////////////////////////////////////////////////////////////
