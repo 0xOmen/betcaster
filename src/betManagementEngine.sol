@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 import {Betcaster} from "./betcaster.sol";
 import {BetTypes} from "./BetTypes.sol";
 
@@ -15,7 +16,7 @@ import {BetTypes} from "./BetTypes.sol";
  *
  * @dev This contract creates bets and delegates storage to the Betcaster contract.
  */
-contract BetManagementEngine is Ownable {
+contract BetManagementEngine is Ownable, ReentrancyGuard {
     error BetManagementEngine__BetAmountMustBeGreaterThanZero();
     error BetManagementEngine__EndTimeMustBeInTheFuture();
     error BetManagementEngine__NotMaker();
@@ -28,6 +29,7 @@ contract BetManagementEngine is Ownable {
     error BetManagementEngine__BetNotClaimable();
     error BetManagementEngine__BetAmountMismatch();
     error BetManagementEngine__TakerCannotBeArbiterOrMaker();
+    error BetManagementEngine__BetTokenAddressCannotBeZeroAddress();
 
     address immutable i_betcaster;
 
@@ -70,6 +72,7 @@ contract BetManagementEngine is Ownable {
         if (_taker == msg.sender || _arbiter == msg.sender) {
             revert BetManagementEngine__TakerCannotBeArbiterOrMaker();
         }
+        if (_betTokenAddress == address(0)) revert BetManagementEngine__BetTokenAddressCannotBeZeroAddress();
 
         // Get new bet number from Betcaster
         uint256 betNumber = Betcaster(i_betcaster).increaseBetNumber();
@@ -102,7 +105,7 @@ contract BetManagementEngine is Ownable {
      * @notice Allows Maker to cancel bet if no taker has accepted.  Returns tokens to maker with no fee.
      * @param _betNumber The number of the bet to cancel
      */
-    function makerCancelBet(uint256 _betNumber) public {
+    function makerCancelBet(uint256 _betNumber) public nonReentrant {
         BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
         if (bet.maker != msg.sender) revert BetManagementEngine__NotMaker();
         if (bet.status != BetTypes.Status.WAITING_FOR_TAKER) revert BetManagementEngine__BetNotWaitingForTaker();
@@ -143,7 +146,7 @@ contract BetManagementEngine is Ownable {
      * @notice Must wait 1 hour after bet is created to cancel.
      * @param _betNumber The number of the bet to cancel
      */
-    function noArbiterCancelBet(uint256 _betNumber) public {
+    function noArbiterCancelBet(uint256 _betNumber) public nonReentrant {
         BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
         if (bet.maker != msg.sender && bet.taker != msg.sender) revert BetManagementEngine__NotMakerOrTaker();
         if (bet.status != BetTypes.Status.WAITING_FOR_ARBITER) revert BetManagementEngine__BetNotWaitingForArbiter();
@@ -162,7 +165,7 @@ contract BetManagementEngine is Ownable {
      * @dev Sends protocol fee to owner of contract address. Does NOT send arbiter fee to arbiter which is done in arbiterManagementEngine.
      * @param _betNumber The number of the bet to claim
      */
-    function claimBet(uint256 _betNumber) public {
+    function claimBet(uint256 _betNumber) public nonReentrant {
         BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
         address winner;
         uint256 protocolRake = Betcaster(i_betcaster).calculateProtocolRake(2 * bet.betAmount);
@@ -182,9 +185,9 @@ contract BetManagementEngine is Ownable {
         }
         emit BetClaimed(_betNumber, winner, bet.status);
         Betcaster(i_betcaster).updateBetStatus(_betNumber, bet.status);
-        Betcaster(i_betcaster).transferTokensToUser(winner, bet.betTokenAddress, winnerTake);
         //transfer protocol rake to owner
         Betcaster(i_betcaster).transferTokensToUser(owner(), bet.betTokenAddress, protocolRake);
+        Betcaster(i_betcaster).transferTokensToUser(winner, bet.betTokenAddress, winnerTake);
     }
 
     /**
@@ -215,7 +218,7 @@ contract BetManagementEngine is Ownable {
      * @notice Must wait the defined cooldown time after bet end time to cancel.
      * @param _betNumber The number of the bet to cancel
      */
-    function emergencyCancel(uint256 _betNumber) public {
+    function emergencyCancel(uint256 _betNumber) public nonReentrant {
         BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
         if (bet.status != BetTypes.Status.IN_PROCESS) revert BetManagementEngine__BetNotInProcess();
         if (msg.sender != bet.maker && msg.sender != bet.taker) revert BetManagementEngine__NotMakerOrTaker();

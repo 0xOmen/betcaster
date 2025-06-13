@@ -17,16 +17,11 @@ import {BetTypes} from "./BetTypes.sol";
  * @dev This is the main contract that stores the state of every agreement.
  */
 contract Betcaster is Ownable {
-    error Betcaster__BetNotWaitingForTaker();
-    error Betcaster__NotMakerOrTaker();
-    error Betcaster__BetNotWaitingForArbiter();
-    error Betcaster__StillInCooldown();
-    error Betcaster__NotTaker();
-    error Betcaster__BetNotInProcess();
     error Betcaster__NotBetManagementEngine();
     error Betcaster__NotArbiterManagementEngine();
     error Betcaster__BetAmountCannotBeZero();
-    error Betcaster__ArbiterFeeCannotBeGreaterThan10000();
+    error Betcaster__ArbiterFeeCannotBeGreaterThan9500();
+    error Betcaster__CannotBeZeroAddress();
 
     // State variables
     uint256 public s_prtocolFee;
@@ -65,11 +60,13 @@ contract Betcaster is Ownable {
 
     // public functions
     function setBetManagementEngine(address _betManagementEngine) public onlyOwner {
+        if (_betManagementEngine == address(0)) revert Betcaster__CannotBeZeroAddress();
         s_betManagementEngine = _betManagementEngine;
         emit BetManagementEngineSet(_betManagementEngine);
     }
 
     function setArbiterManagementEngine(address _arbiterManagementEngine) public onlyOwner {
+        if (_arbiterManagementEngine == address(0)) revert Betcaster__CannotBeZeroAddress();
         s_arbiterManagementEngine = _arbiterManagementEngine;
         emit ArbiterManagementEngineSet(_arbiterManagementEngine);
     }
@@ -89,7 +86,7 @@ contract Betcaster is Ownable {
 
     function createBet(uint256 _betNumber, BetTypes.Bet memory _bet) public onlyBetManagementEngine {
         if (_bet.betAmount == 0) revert Betcaster__BetAmountCannotBeZero();
-        if (_bet.arbiterFee > 10000) revert Betcaster__ArbiterFeeCannotBeGreaterThan10000();
+        if (_bet.arbiterFee > 9500) revert Betcaster__ArbiterFeeCannotBeGreaterThan9500();
         s_allBets[_betNumber] = _bet;
     }
 

@@ -1297,7 +1297,7 @@ contract BetManagementEngineTest is Test {
 
     function testFuzz_ForfeitBet_WithVariousArbiterFees(uint256 arbiterFeePercent) public {
         // Bound arbiter fee to valid range
-        arbiterFeePercent = bound(arbiterFeePercent, 0, 10000); // 0% to 100%
+        arbiterFeePercent = bound(arbiterFeePercent, 0, 9500); // 0% to 95%
 
         uint256 endTime = block.timestamp + 1 days;
 

@@ -334,7 +334,7 @@ contract ArbiterManagementEngineTest is Test {
     }
 
     function testSelectWinner_WithMaxArbiterFee() public {
-        uint256 maxFee = 10000; // 100%
+        uint256 maxFee = 9500; // 95%
 
         // Create bet with maximum arbiter fee
         vm.prank(maker);
@@ -345,18 +345,20 @@ contract ArbiterManagementEngineTest is Test {
         vm.prank(taker);
         betManagementEngine.acceptBet(2);
 
+        uint256 betcasterStartingBalance = mockToken.balanceOf(address(betcaster));
+
         vm.prank(arbiter);
         arbiterManagementEngine.AribiterAcceptRole(2);
 
         vm.warp(block.timestamp + 2 days);
 
-        uint256 expectedFee = (BET_AMOUNT * 2) * maxFee / 10000; // Should be entire pot
+        uint256 expectedFee = (BET_AMOUNT * 2) * maxFee / 10000;
         uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter);
 
         vm.prank(arbiter);
         arbiterManagementEngine.selectWinner(2, maker);
 
         assertEq(mockToken.balanceOf(arbiter), arbiterBalanceBefore + expectedFee);
-        assertEq(expectedFee, BET_AMOUNT * 2); // Verify it's the entire pot
+        assertEq(mockToken.balanceOf(address(betcaster)), betcasterStartingBalance - expectedFee); // Verify balance of Betcaster contract
     }
 }
