@@ -238,7 +238,7 @@ contract BetcasterOwnableTest is Test {
         assertEq(betcaster.owner(), owner);
 
         // Verify protocol fee is accessible (public variable)
-        assertEq(betcaster.s_prtocolFee(), PROTOCOL_FEE);
+        assertEq(betcaster.s_protocolFee(), PROTOCOL_FEE);
 
         // Verify bet number starts at 0
         assertEq(betcaster.getCurrentBetNumber(), 0);
@@ -248,7 +248,7 @@ contract BetcasterOwnableTest is Test {
         betcaster.transferOwnership(newOwner);
 
         assertEq(betcaster.owner(), newOwner);
-        assertEq(betcaster.s_prtocolFee(), PROTOCOL_FEE);
+        assertEq(betcaster.s_protocolFee(), PROTOCOL_FEE);
         assertEq(betcaster.getCurrentBetNumber(), 0);
     }
 

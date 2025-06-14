@@ -63,8 +63,8 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
         address _arbiter,
         address _betTokenAddress,
         uint256 _betAmount,
-        uint256 _protocolFee,
         uint256 _endTime,
+        uint256 _protocolFee,
         uint256 _arbiterFee,
         string memory _betAgreement
     ) public {

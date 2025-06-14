@@ -67,7 +67,14 @@ contract ArbiterManagementEngineTest is Test {
 
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, block.timestamp + 1 days, ARBITER_FEE, BET_AGREEMENT
+            taker,
+            arbiter,
+            address(mockToken),
+            BET_AMOUNT,
+            block.timestamp + 1 days,
+            PROTOCOL_FEE,
+            ARBITER_FEE,
+            BET_AGREEMENT
         );
     }
 
@@ -121,7 +128,14 @@ contract ArbiterManagementEngineTest is Test {
         // Create a bet with zero address arbiter (anyone can be arbiter)
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, address(0), address(mockToken), BET_AMOUNT, block.timestamp + 1 days, ARBITER_FEE, BET_AGREEMENT
+            taker,
+            address(0),
+            address(mockToken),
+            BET_AMOUNT,
+            block.timestamp + 1 days,
+            PROTOCOL_FEE,
+            ARBITER_FEE,
+            BET_AGREEMENT
         );
 
         vm.prank(taker);
@@ -282,7 +296,14 @@ contract ArbiterManagementEngineTest is Test {
         // Create a bet with fuzzed parameters
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), betAmount, block.timestamp + 1 days, arbiterFeePercent, BET_AGREEMENT
+            taker,
+            arbiter,
+            address(mockToken),
+            betAmount,
+            block.timestamp + 1 days,
+            PROTOCOL_FEE,
+            arbiterFeePercent,
+            BET_AGREEMENT
         );
 
         // Accept bet and arbiter role
@@ -312,7 +333,7 @@ contract ArbiterManagementEngineTest is Test {
         // Create bet with zero arbiter fee
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, block.timestamp + 1 days, 0, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, block.timestamp + 1 days, PROTOCOL_FEE, 0, BET_AGREEMENT
         );
 
         vm.prank(taker);
@@ -335,11 +356,12 @@ contract ArbiterManagementEngineTest is Test {
 
     function testSelectWinner_WithMaxArbiterFee() public {
         uint256 maxFee = 9500; // 95%
+        uint256 protocolFee = 9999 - maxFee;
 
         // Create bet with maximum arbiter fee
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, block.timestamp + 1 days, maxFee, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, block.timestamp + 1 days, protocolFee, maxFee, BET_AGREEMENT
         );
 
         vm.prank(taker);

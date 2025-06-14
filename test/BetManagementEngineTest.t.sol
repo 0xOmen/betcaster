@@ -71,7 +71,14 @@ contract BetManagementEngineTest is Test {
     function testCreateBet() public {
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, block.timestamp + 1 days, ARBITER_FEE, BET_AGREEMENT
+            taker,
+            arbiter,
+            address(mockToken),
+            BET_AMOUNT,
+            block.timestamp + 1 days,
+            PROTOCOL_FEE,
+            ARBITER_FEE,
+            BET_AGREEMENT
         );
 
         BetTypes.Bet memory createdBet = betcaster.getBet(1);
@@ -81,6 +88,9 @@ contract BetManagementEngineTest is Test {
         assertEq(createdBet.arbiter, arbiter);
         assertEq(createdBet.betTokenAddress, address(mockToken));
         assertEq(createdBet.betAmount, BET_AMOUNT);
+        assertEq(createdBet.protocolFee, PROTOCOL_FEE);
+        assertEq(createdBet.arbiterFee, ARBITER_FEE);
+        assertEq(createdBet.betAgreement, BET_AGREEMENT);
     }
 
     function testCreateBetRevertsWithZeroBetAmount() public {
@@ -94,6 +104,7 @@ contract BetManagementEngineTest is Test {
             address(mockToken),
             0, // Zero bet amount
             endTime,
+            PROTOCOL_FEE,
             ARBITER_FEE,
             BET_AGREEMENT
         );
@@ -112,6 +123,7 @@ contract BetManagementEngineTest is Test {
             address(mockToken),
             BET_AMOUNT,
             pastEndTime, // Past end time
+            PROTOCOL_FEE,
             ARBITER_FEE,
             BET_AGREEMENT
         );
@@ -126,6 +138,7 @@ contract BetManagementEngineTest is Test {
             address(mockToken),
             BET_AMOUNT,
             block.timestamp, // Current timestamp
+            PROTOCOL_FEE,
             ARBITER_FEE,
             BET_AGREEMENT
         );
@@ -138,7 +151,7 @@ contract BetManagementEngineTest is Test {
         vm.prank(poorUser);
         vm.expectRevert(); // ERC20 transfer will revert
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
     }
 
@@ -150,7 +163,7 @@ contract BetManagementEngineTest is Test {
         vm.prank(userWithoutApproval);
         vm.expectRevert(); // ERC20 transferFrom will revert due to insufficient allowance
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
     }
 
@@ -164,7 +177,7 @@ contract BetManagementEngineTest is Test {
         // Create bet first
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         uint256 makerBalanceBefore = mockToken.balanceOf(maker);
@@ -193,7 +206,7 @@ contract BetManagementEngineTest is Test {
         // Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         // Try to cancel as non-maker
@@ -212,7 +225,7 @@ contract BetManagementEngineTest is Test {
         // Create and accept bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         vm.prank(taker);
@@ -240,7 +253,7 @@ contract BetManagementEngineTest is Test {
         // Create bet with specific taker
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         uint256 takerBalanceBefore = mockToken.balanceOf(taker);
@@ -256,6 +269,7 @@ contract BetManagementEngineTest is Test {
             timestamp: block.timestamp,
             endTime: endTime,
             status: BetTypes.Status.WAITING_FOR_ARBITER,
+            protocolFee: PROTOCOL_FEE,
             arbiterFee: ARBITER_FEE,
             betAgreement: BET_AGREEMENT
         });
@@ -284,7 +298,7 @@ contract BetManagementEngineTest is Test {
         // Create bet with open taker (address(0))
         vm.prank(maker);
         betManagementEngine.createBet(
-            address(0), arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            address(0), arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         uint256 user1BalanceBefore = mockToken.balanceOf(user1);
@@ -310,7 +324,7 @@ contract BetManagementEngineTest is Test {
         // Create and accept bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         vm.prank(taker);
@@ -328,7 +342,7 @@ contract BetManagementEngineTest is Test {
         // Create bet with specific taker
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         // Try to accept as wrong user
@@ -344,7 +358,7 @@ contract BetManagementEngineTest is Test {
         // Create bet with poor taker
         vm.prank(maker);
         betManagementEngine.createBet(
-            poorTaker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            poorTaker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         // Try to accept without sufficient balance
@@ -363,7 +377,7 @@ contract BetManagementEngineTest is Test {
         // Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         // Accept bet to set status to WAITING_FOR_ARBITER
@@ -405,7 +419,7 @@ contract BetManagementEngineTest is Test {
         // Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         // Accept bet
@@ -440,7 +454,7 @@ contract BetManagementEngineTest is Test {
         // Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         // Try to cancel as unauthorized user
@@ -455,7 +469,7 @@ contract BetManagementEngineTest is Test {
         // Create bet (status is WAITING_FOR_TAKER)
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         // Try to cancel when not in WAITING_FOR_ARBITER status
@@ -470,7 +484,7 @@ contract BetManagementEngineTest is Test {
         // Create and accept bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         vm.prank(taker);
@@ -499,12 +513,21 @@ contract BetManagementEngineTest is Test {
 
         // Create first bet
         vm.prank(maker);
-        betManagementEngine.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, "First bet");
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, "First bet"
+        );
 
         // Create second bet
         vm.prank(user1);
         betManagementEngine.createBet(
-            user2, arbiter, address(mockToken), BET_AMOUNT / 2, endTime + 1 hours, ARBITER_FEE, "Second bet"
+            user2,
+            arbiter,
+            address(mockToken),
+            BET_AMOUNT / 2,
+            endTime + 1 hours,
+            PROTOCOL_FEE,
+            ARBITER_FEE,
+            "Second bet"
         );
 
         // Verify both bets exist
@@ -530,10 +553,14 @@ contract BetManagementEngineTest is Test {
 
         // Create multiple bets
         vm.prank(maker);
-        betManagementEngine.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, "Bet 1");
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, "Bet 1"
+        );
 
         vm.prank(user1);
-        betManagementEngine.createBet(user2, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, "Bet 2");
+        betManagementEngine.createBet(
+            user2, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, "Bet 2"
+        );
 
         // Cancel first bet
         vm.prank(maker);
@@ -559,7 +586,7 @@ contract BetManagementEngineTest is Test {
         // Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         // Accept bet
@@ -587,7 +614,7 @@ contract BetManagementEngineTest is Test {
         // Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         // Accept bet
@@ -684,7 +711,7 @@ contract BetManagementEngineTest is Test {
         // Create bet but don't complete it
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         // Try to claim bet that's still WAITING_FOR_TAKER
@@ -699,7 +726,7 @@ contract BetManagementEngineTest is Test {
         // Create and accept bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         vm.prank(taker);
@@ -750,7 +777,18 @@ contract BetManagementEngineTest is Test {
         vm.prank(betcaster.owner());
         betcaster.setProtocolFee(0);
 
-        _setupBetForClaimingMakerWins();
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, block.timestamp + 1 days, 0, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(1);
+
+        vm.warp(block.timestamp + 2 days);
 
         uint256 totalBetAmount = BET_AMOUNT * 2;
         uint256 expectedArbiterPayment = totalBetAmount * ARBITER_FEE / 10000;
@@ -758,6 +796,9 @@ contract BetManagementEngineTest is Test {
 
         uint256 makerBalanceBefore = mockToken.balanceOf(maker);
         uint256 ownerBalanceBefore = mockToken.balanceOf(betManagementEngine.owner());
+
+        vm.prank(arbiter);
+        arbiterManagementEngine.selectWinner(1, maker);
 
         // Claim bet
         vm.prank(maker);
@@ -773,7 +814,9 @@ contract BetManagementEngineTest is Test {
 
         // Create bet with zero arbiter fee
         vm.prank(maker);
-        betManagementEngine.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, 0, BET_AGREEMENT);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, 0, BET_AGREEMENT
+        );
 
         // Complete the bet flow
         vm.prank(taker);
@@ -816,7 +859,7 @@ contract BetManagementEngineTest is Test {
         // Bound inputs to reasonable ranges
         betAmount = bound(betAmount, 1e18, 100000e18); // 1 to 100K tokens
         protocolFeePercent = bound(protocolFeePercent, 0, 500); // 0% to 5%
-        arbiterFeePercent = bound(arbiterFeePercent, 0, 1000); // 0% to 10%
+        arbiterFeePercent = bound(arbiterFeePercent, 0, 9499); // 0% to 10%
 
         // Ensure total fees don't exceed 100%
         vm.assume(protocolFeePercent + arbiterFeePercent <= 10000);
@@ -833,7 +876,7 @@ contract BetManagementEngineTest is Test {
         // Create bet with fuzzed parameters
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), betAmount, endTime, arbiterFeePercent, BET_AGREEMENT
+            taker, arbiter, address(mockToken), betAmount, endTime, protocolFeePercent, arbiterFeePercent, BET_AGREEMENT
         );
 
         // Complete bet flow
@@ -882,7 +925,7 @@ contract BetManagementEngineTest is Test {
         // 1. Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         // 2. Accept bet
@@ -931,7 +974,7 @@ contract BetManagementEngineTest is Test {
         // Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         // Accept bet
@@ -995,7 +1038,7 @@ contract BetManagementEngineTest is Test {
         // Create bet but don't put it in process
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         // Try to forfeit bet that's still WAITING_FOR_TAKER
@@ -1010,7 +1053,7 @@ contract BetManagementEngineTest is Test {
         // Create and accept bet but don't have arbiter accept
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         vm.prank(taker);
@@ -1073,7 +1116,7 @@ contract BetManagementEngineTest is Test {
         // Create bet with high arbiter fee
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, highArbiterFee, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, highArbiterFee, BET_AGREEMENT
         );
 
         // Complete bet setup
@@ -1111,7 +1154,7 @@ contract BetManagementEngineTest is Test {
         // 1. Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         // 2. Accept bet
@@ -1157,7 +1200,7 @@ contract BetManagementEngineTest is Test {
         // 1. Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         // 2. Accept bet
@@ -1197,12 +1240,12 @@ contract BetManagementEngineTest is Test {
         // Create two identical bets
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         vm.prank(maker);
         betManagementEngine.createBet(
-            user2, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            user2, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         // Set up both bets identically
@@ -1252,12 +1295,12 @@ contract BetManagementEngineTest is Test {
                         FORFEIT BET EDGE CASES
     //////////////////////////////////////////////////////////////*/
 
-    function testForfeitBet_WithZeroArbiterFee() public {
+    function testForfeitBet_WithZeroProtocolAndArbiterFee() public {
         uint256 endTime = block.timestamp + 1 days;
 
         // Create bet with zero arbiter fee
         vm.prank(maker);
-        betManagementEngine.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, 0, BET_AGREEMENT);
+        betManagementEngine.createBet(taker, arbiter, address(mockToken), BET_AMOUNT, endTime, 0, 0, BET_AGREEMENT);
 
         // Complete bet setup
         vm.prank(taker);
@@ -1276,6 +1319,14 @@ contract BetManagementEngineTest is Test {
         // Verify arbiter fee remains zero and status changed
         assertEq(betcaster.getBet(1).arbiterFee, 0);
         assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.TAKER_WINS));
+
+        vm.prank(taker);
+        betManagementEngine.claimBet(1);
+
+        // Verify protocol fee is deducted
+        assertEq(mockToken.balanceOf(maker), INITIAL_TOKEN_SUPPLY - BET_AMOUNT);
+        assertEq(mockToken.balanceOf(taker), INITIAL_TOKEN_SUPPLY + BET_AMOUNT);
+        assertEq(mockToken.balanceOf(betManagementEngine.owner()), 0);
     }
 
     function testForfeitBet_EventEmission() public {
@@ -1297,14 +1348,22 @@ contract BetManagementEngineTest is Test {
 
     function testFuzz_ForfeitBet_WithVariousArbiterFees(uint256 arbiterFeePercent) public {
         // Bound arbiter fee to valid range
-        arbiterFeePercent = bound(arbiterFeePercent, 0, 9500); // 0% to 95%
+        arbiterFeePercent = bound(arbiterFeePercent, 0, 9999); // 0% to 95%
+        uint256 protocolFeePercent = 9999 - arbiterFeePercent; // 0% to 95%
 
         uint256 endTime = block.timestamp + 1 days;
 
         // Create bet with fuzzed arbiter fee
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, arbiterFeePercent, BET_AGREEMENT
+            taker,
+            arbiter,
+            address(mockToken),
+            BET_AMOUNT,
+            endTime,
+            protocolFeePercent,
+            arbiterFeePercent,
+            BET_AGREEMENT
         );
 
         // Complete bet setup
@@ -1324,6 +1383,20 @@ contract BetManagementEngineTest is Test {
         // Verify arbiter fee is always set to zero regardless of initial value
         assertEq(betcaster.getBet(1).arbiterFee, 0);
         assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.TAKER_WINS));
+
+        vm.prank(taker);
+        betManagementEngine.claimBet(1);
+
+        uint256 expectedProtocolFee = BET_AMOUNT * 2 * (protocolFeePercent) / 10000;
+
+        // Verify protocol fee is deducted
+        assertEq(mockToken.balanceOf(maker), INITIAL_TOKEN_SUPPLY - BET_AMOUNT);
+        assertEq(
+            mockToken.balanceOf(taker),
+            INITIAL_TOKEN_SUPPLY + BET_AMOUNT
+                - (BET_AMOUNT * 2 * (protocolFeePercent + betcaster.getBet(1).arbiterFee) / 10000)
+        );
+        assertEq(mockToken.balanceOf(betManagementEngine.owner()), expectedProtocolFee);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -1337,7 +1410,7 @@ contract BetManagementEngineTest is Test {
         // Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         // Accept bet
@@ -1419,7 +1492,7 @@ contract BetManagementEngineTest is Test {
         // Create bet but don't put it in process
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         // Warp past cooldown period
@@ -1441,7 +1514,7 @@ contract BetManagementEngineTest is Test {
         // Create and accept bet but don't have arbiter accept
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         vm.prank(taker);
@@ -1615,7 +1688,7 @@ contract BetManagementEngineTest is Test {
         // 1. Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         // 2. Accept bet
@@ -1653,12 +1726,12 @@ contract BetManagementEngineTest is Test {
         // Create two identical bets
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         vm.prank(maker);
         betManagementEngine.createBet(
-            user2, arbiter, address(mockToken), BET_AMOUNT, endTime, ARBITER_FEE, BET_AGREEMENT
+            user2, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         // Accept both bets
@@ -1817,7 +1890,7 @@ contract BetManagementEngineTest is Test {
         // Create bet with fuzzed amount
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), betAmount, endTime, ARBITER_FEE, BET_AGREEMENT
+            taker, arbiter, address(mockToken), betAmount, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
         );
 
         // Complete bet setup
@@ -1841,5 +1914,62 @@ contract BetManagementEngineTest is Test {
         assertEq(mockToken.balanceOf(maker), makerBalanceBefore + betAmount);
         assertEq(mockToken.balanceOf(taker), takerBalanceBefore + betAmount);
         assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.CANCELLED));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                  FUZZ TESTS VARIOUS TOKEN AMOUNTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testFuzz_CreateBet_WithVariousTokenAmounts(uint256 betAmount) public {
+        // Bound bet amount to reasonable range
+        betAmount = bound(betAmount, 1, 1e6);
+
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Track initial balances
+        uint256 makerInitialBalance = mockToken.balanceOf(maker);
+        uint256 takerInitialBalance = mockToken.balanceOf(taker);
+        uint256 arbiterInitialBalance = mockToken.balanceOf(arbiter);
+        uint256 ownerInitialBalance = mockToken.balanceOf(betManagementEngine.owner());
+
+        // 1. Create bet
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), betAmount, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        // 2. Accept bet
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        // 3. Arbiter accepts role
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(1);
+
+        // 4. Time passes
+        vm.warp(block.timestamp + 2 days);
+
+        // 5. Arbiter selects winner
+        vm.prank(arbiter);
+        arbiterManagementEngine.selectWinner(1, maker);
+
+        // 6. Claim bet
+        vm.prank(user1);
+        betManagementEngine.claimBet(1);
+
+        // Calculate expected final balances
+        uint256 totalBetAmount = betAmount * 2;
+        uint256 protocolRake = totalBetAmount * PROTOCOL_FEE / 10000;
+        uint256 arbiterPayment = totalBetAmount * ARBITER_FEE / 10000;
+        uint256 winnerTake = totalBetAmount - protocolRake - arbiterPayment;
+
+        // Verify final balances
+        assertEq(mockToken.balanceOf(maker), makerInitialBalance - betAmount + winnerTake);
+        assertEq(mockToken.balanceOf(taker), takerInitialBalance - betAmount);
+        assertEq(mockToken.balanceOf(arbiter), arbiterInitialBalance + arbiterPayment);
+        assertEq(mockToken.balanceOf(betManagementEngine.owner()), ownerInitialBalance + protocolRake);
+
+        // Verify bet status
+        assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.COMPLETED_MAKER_WINS));
     }
 }
