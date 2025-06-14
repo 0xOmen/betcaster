@@ -40,6 +40,7 @@ library BetTypes {
         uint256 timestamp;
         uint256 endTime;
         Status status;
+        uint256 protocolFee;
         uint256 arbiterFee;
         string betAgreement;
     }

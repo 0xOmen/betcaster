@@ -21,12 +21,12 @@ contract Betcaster is Ownable {
     error Betcaster__NotBetManagementEngine();
     error Betcaster__NotArbiterManagementEngine();
     error Betcaster__BetAmountCannotBeZero();
-    error Betcaster__ArbiterFeeCannotBeGreaterThan9500();
+    error Betcaster__FeesCannotBeGreaterThan10000();
     error Betcaster__CannotBeZeroAddress();
 
     // State variables
     bool private s_protocolPaused;
-    uint256 public s_prtocolFee;
+    uint256 public s_protocolFee;
     uint256 private s_betNumber;
     mapping(uint256 => BetTypes.Bet) private s_allBets;
     address private s_betManagementEngine;
@@ -57,7 +57,7 @@ contract Betcaster is Ownable {
      * @param protocolFee The fee taken from each bet to cover protocol costs (100 = 1%)
      */
     constructor(uint256 protocolFee) Ownable(msg.sender) {
-        s_prtocolFee = protocolFee;
+        s_protocolFee = protocolFee;
         s_protocolPaused = false;
     }
 
@@ -85,7 +85,7 @@ contract Betcaster is Ownable {
     }
 
     function setProtocolFee(uint256 _protocolFee) public onlyOwner {
-        s_prtocolFee = _protocolFee;
+        s_protocolFee = _protocolFee;
     }
 
     function setEmergencyCancelCooldown(uint256 _emergencyCancelCooldown) public onlyOwner {
@@ -99,7 +99,7 @@ contract Betcaster is Ownable {
 
     function createBet(uint256 _betNumber, BetTypes.Bet memory _bet) public onlyBetManagementEngine {
         if (_bet.betAmount == 0) revert Betcaster__BetAmountCannotBeZero();
-        if (_bet.arbiterFee > 9500) revert Betcaster__ArbiterFeeCannotBeGreaterThan9500();
+        if (_bet.arbiterFee + _bet.protocolFee >= 10000) revert Betcaster__FeesCannotBeGreaterThan10000();
         s_allBets[_betNumber] = _bet;
     }
 
@@ -168,7 +168,7 @@ contract Betcaster is Ownable {
         return _betAmount * _arbiterFee / 10000;
     }
 
-    function calculateProtocolRake(uint256 _betAmount) public view returns (uint256) {
-        return _betAmount * s_prtocolFee / 10000;
+    function calculateProtocolRake(uint256 _betAmount, uint256 _protocolFee) public pure returns (uint256) {
+        return _betAmount * _protocolFee / 10000;
     }
 }

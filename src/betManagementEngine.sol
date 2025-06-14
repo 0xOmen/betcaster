@@ -63,6 +63,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
         address _arbiter,
         address _betTokenAddress,
         uint256 _betAmount,
+        uint256 _protocolFee,
         uint256 _endTime,
         uint256 _arbiterFee,
         string memory _betAgreement
@@ -85,6 +86,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
             betTokenAddress: _betTokenAddress,
             betAmount: _betAmount,
             timestamp: block.timestamp,
+            protocolFee: _protocolFee,
             endTime: _endTime,
             status: BetTypes.Status.WAITING_FOR_TAKER,
             arbiterFee: _arbiterFee,
@@ -168,7 +170,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
     function claimBet(uint256 _betNumber) public nonReentrant {
         BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
         address winner;
-        uint256 protocolRake = Betcaster(i_betcaster).calculateProtocolRake(2 * bet.betAmount);
+        uint256 protocolRake = Betcaster(i_betcaster).calculateProtocolRake(2 * bet.betAmount, bet.protocolFee);
         uint256 arbiterPayment = Betcaster(i_betcaster).calculateArbiterPayment(2 * bet.betAmount, bet.arbiterFee);
         uint256 winnerTake = 2 * bet.betAmount - protocolRake - arbiterPayment;
         if (protocolRake + arbiterPayment + winnerTake > 2 * bet.betAmount) {
@@ -192,7 +194,8 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
 
     /**
      * @notice Allows Maker or Taker to forfeit bet early.
-     * Forfieter gives up tokens, no aribter fee is taken.
+     * Forfieter gives up tokens, no aribter fee is taken so arbiterFee is set to zero for bet.
+     * Winner must still go through normal claim process
      * @notice Bet must be in process.
      * @notice sender must be maker or taker.
      * @param _betNumber The number of the bet to forfeit
