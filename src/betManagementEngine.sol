@@ -75,6 +75,10 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
         }
         if (_betTokenAddress == address(0)) revert BetManagementEngine__BetTokenAddressCannotBeZeroAddress();
 
+        if (_protocolFee < Betcaster(i_betcaster).s_protocolFee()) {
+            _protocolFee = Betcaster(i_betcaster).s_protocolFee();
+        }
+
         // Get new bet number from Betcaster
         uint256 betNumber = Betcaster(i_betcaster).increaseBetNumber();
 
@@ -101,6 +105,35 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
 
         // Transfer betAmount from maker to Betcaster contract
         Betcaster(i_betcaster).depositToBetcaster(msg.sender, _betTokenAddress, _betAmount);
+    }
+
+    /**
+     * @notice Allows Maker to change bet parameters if bet is waiting for taker.
+     * @param _betNumber The number of the bet to change
+     * @param _taker The new taker address
+     * @param _arbiter The new arbiter address
+     * @param _endTime The new end time
+     * @param _betAgreement The new bet agreement
+     */
+    function changeBetParameters(
+        uint256 _betNumber,
+        address _taker,
+        address _arbiter,
+        uint256 _endTime,
+        string memory _betAgreement
+    ) public {
+        BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
+        if (bet.maker != msg.sender) revert BetManagementEngine__NotMaker();
+        if (bet.status != BetTypes.Status.WAITING_FOR_TAKER) revert BetManagementEngine__BetNotWaitingForTaker();
+        if (_endTime <= block.timestamp) revert BetManagementEngine__EndTimeMustBeInTheFuture();
+        if (_taker == msg.sender || _arbiter == msg.sender) {
+            revert BetManagementEngine__TakerCannotBeArbiterOrMaker();
+        }
+        bet.taker = _taker;
+        bet.arbiter = _arbiter;
+        bet.endTime = _endTime;
+        bet.betAgreement = _betAgreement;
+        Betcaster(i_betcaster).createBet(_betNumber, bet);
     }
 
     /**
