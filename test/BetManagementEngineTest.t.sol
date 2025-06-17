@@ -1297,6 +1297,8 @@ contract BetManagementEngineTest is Test {
 
     function testForfeitBet_WithZeroProtocolAndArbiterFee() public {
         uint256 endTime = block.timestamp + 1 days;
+        vm.prank(betcaster.owner());
+        betcaster.setProtocolFee(0);
 
         // Create bet with zero arbiter fee
         vm.prank(maker);
@@ -1350,6 +1352,8 @@ contract BetManagementEngineTest is Test {
         // Bound arbiter fee to valid range
         arbiterFeePercent = bound(arbiterFeePercent, 0, 9999); // 0% to 95%
         uint256 protocolFeePercent = 9999 - arbiterFeePercent; // 0% to 95%
+        vm.prank(betcaster.owner());
+        betcaster.setProtocolFee(protocolFeePercent);
 
         uint256 endTime = block.timestamp + 1 days;
 
@@ -1971,5 +1975,162 @@ contract BetManagementEngineTest is Test {
 
         // Verify bet status
         assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.COMPLETED_MAKER_WINS));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    CHANGE BET PARAMETERS TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testChangeBetParametersSuccess() public {
+        // Create initial bet
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker,
+            arbiter,
+            address(mockToken),
+            BET_AMOUNT,
+            block.timestamp + 1 days,
+            PROTOCOL_FEE,
+            ARBITER_FEE,
+            BET_AGREEMENT
+        );
+
+        // New parameters
+        address newTaker = user1;
+        address newArbiter = user2;
+        uint256 newEndTime = block.timestamp + 2 days;
+        string memory newAgreement = "New agreement text";
+
+        // Change parameters
+        vm.prank(maker);
+        betManagementEngine.changeBetParameters(1, newTaker, newArbiter, newEndTime, newAgreement);
+
+        // Verify changes
+        BetTypes.Bet memory updatedBet = betcaster.getBet(1);
+        assertEq(updatedBet.taker, newTaker);
+        assertEq(updatedBet.arbiter, newArbiter);
+        assertEq(updatedBet.endTime, newEndTime);
+        assertEq(updatedBet.betAgreement, newAgreement);
+    }
+
+    function testChangeBetParametersRevertsWhenNotMaker() public {
+        // Create initial bet
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker,
+            arbiter,
+            address(mockToken),
+            BET_AMOUNT,
+            block.timestamp + 1 days,
+            PROTOCOL_FEE,
+            ARBITER_FEE,
+            BET_AGREEMENT
+        );
+
+        // Try to change parameters as non-maker
+        vm.prank(taker);
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__NotMaker.selector);
+        betManagementEngine.changeBetParameters(1, user1, user2, block.timestamp + 2 days, "New agreement");
+    }
+
+    function testChangeBetParametersRevertsWhenNotWaitingForTaker() public {
+        // Create and accept bet
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker,
+            arbiter,
+            address(mockToken),
+            BET_AMOUNT,
+            block.timestamp + 1 days,
+            PROTOCOL_FEE,
+            ARBITER_FEE,
+            BET_AGREEMENT
+        );
+
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        // Try to change parameters after bet is accepted
+        vm.prank(maker);
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__BetNotWaitingForTaker.selector);
+        betManagementEngine.changeBetParameters(1, user1, user2, block.timestamp + 2 days, "New agreement");
+    }
+
+    function testChangeBetParametersRevertsWithPastEndTime() public {
+        vm.warp(block.timestamp + 1 days);
+        // Create initial bet
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker,
+            arbiter,
+            address(mockToken),
+            BET_AMOUNT,
+            block.timestamp + 1 days,
+            PROTOCOL_FEE,
+            ARBITER_FEE,
+            BET_AGREEMENT
+        );
+
+        // Try to change to past end time
+        vm.prank(maker);
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__EndTimeMustBeInTheFuture.selector);
+        betManagementEngine.changeBetParameters(1, user1, user2, block.timestamp - 1 hours, "New agreement");
+    }
+
+    function testChangeBetParametersRevertsWithCurrentTimestamp() public {
+        // Create initial bet
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker,
+            arbiter,
+            address(mockToken),
+            BET_AMOUNT,
+            block.timestamp + 1 days,
+            PROTOCOL_FEE,
+            ARBITER_FEE,
+            BET_AGREEMENT
+        );
+
+        // Try to change to current timestamp
+        vm.prank(maker);
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__EndTimeMustBeInTheFuture.selector);
+        betManagementEngine.changeBetParameters(1, user1, user2, block.timestamp, "New agreement");
+    }
+
+    function testChangeBetParametersRevertsWithMakerAsTakerOrArbiter() public {
+        // Create initial bet
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker,
+            arbiter,
+            address(mockToken),
+            BET_AMOUNT,
+            block.timestamp + 1 days,
+            PROTOCOL_FEE,
+            ARBITER_FEE,
+            BET_AGREEMENT
+        );
+
+        // Try to set maker as taker
+        vm.prank(maker);
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__TakerCannotBeArbiterOrMaker.selector);
+        betManagementEngine.changeBetParameters(
+            1,
+            maker, // maker as taker
+            user2,
+            block.timestamp + 2 days,
+            "New agreement"
+        );
+
+        // Try to set maker as arbiter
+        vm.prank(maker);
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__TakerCannotBeArbiterOrMaker.selector);
+        betManagementEngine.changeBetParameters(
+            1,
+            user1,
+            maker, // maker as arbiter
+            block.timestamp + 2 days,
+            "New agreement"
+        );
     }
 }
