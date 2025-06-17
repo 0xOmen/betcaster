@@ -221,7 +221,8 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
         emit BetClaimed(_betNumber, winner, bet.status);
         Betcaster(i_betcaster).updateBetStatus(_betNumber, bet.status);
         //transfer protocol rake to owner
-        Betcaster(i_betcaster).transferTokensToUser(owner(), bet.betTokenAddress, protocolRake);
+        address protocolFeeDepositAddress = Betcaster(i_betcaster).getProtocolFeeDepositAddress();
+        Betcaster(i_betcaster).transferTokensToUser(protocolFeeDepositAddress, bet.betTokenAddress, protocolRake);
         Betcaster(i_betcaster).transferTokensToUser(winner, bet.betTokenAddress, winnerTake);
     }
 

@@ -12,6 +12,7 @@ contract ArbiterManagementEngine is Ownable {
     error ArbiterManagementEngine__BetNotInProcess();
     error ArbiterManagementEngine__EndTimeNotReached();
     error ArbiterManagementEngine__WinnerNotValid();
+    error ArbiterManagementEngine__TakerCannotBeArbiter();
 
     address private s_betcaster;
 
@@ -28,6 +29,9 @@ contract ArbiterManagementEngine is Ownable {
             revert ArbiterManagementEngine__BetNotWaitingForArbiter();
         }
         if (bet.arbiter == address(0)) {
+            if (bet.taker == msg.sender) {
+                revert ArbiterManagementEngine__TakerCannotBeArbiter();
+            }
             Betcaster(s_betcaster).updateBetArbiter(_betNumber, msg.sender);
         } else if (bet.arbiter != msg.sender) {
             revert ArbiterManagementEngine__NotArbiter();
