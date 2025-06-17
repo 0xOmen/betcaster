@@ -98,6 +98,10 @@ contract BetcasterTest is Test {
         assertEq(betcaster.getCurrentBetNumber(), 0);
     }
 
+    function testConstructorInitializesProtocolFeeDepositAddressToOwner() public view {
+        assertEq(betcaster.getProtocolFeeDepositAddress(), owner);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             ACCESS TESTS
     //////////////////////////////////////////////////////////////*/
@@ -125,6 +129,10 @@ contract BetcasterTest is Test {
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1));
         vm.prank(user1);
         betcaster.unpauseProtocol();
+
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1));
+        vm.prank(user1);
+        betcaster.setProtocolFeeDepositAddress(user1);
     }
 
     function testOnlyBetManagementEngineAccessControl() public {

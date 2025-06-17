@@ -31,6 +31,7 @@ contract Betcaster is Ownable {
     mapping(uint256 => BetTypes.Bet) private s_allBets;
     address private s_betManagementEngine;
     address private s_arbiterManagementEngine;
+    address private s_prtocolFeeDepositAddress;
     uint256 private s_emergencyCancelCooldown;
 
     // Events
@@ -59,6 +60,7 @@ contract Betcaster is Ownable {
     constructor(uint256 protocolFee) Ownable(msg.sender) {
         s_protocolFee = protocolFee;
         s_protocolPaused = false;
+        s_prtocolFeeDepositAddress = msg.sender;
     }
 
     // external functions
@@ -74,6 +76,11 @@ contract Betcaster is Ownable {
         if (_arbiterManagementEngine == address(0)) revert Betcaster__CannotBeZeroAddress();
         s_arbiterManagementEngine = _arbiterManagementEngine;
         emit ArbiterManagementEngineSet(_arbiterManagementEngine);
+    }
+
+    function setProtocolFeeDepositAddress(address _protocolFeeDepositAddress) public onlyOwner {
+        if (_protocolFeeDepositAddress == address(0)) revert Betcaster__CannotBeZeroAddress();
+        s_prtocolFeeDepositAddress = _protocolFeeDepositAddress;
     }
 
     function pauseProtocol() public onlyOwner {
@@ -170,5 +177,9 @@ contract Betcaster is Ownable {
 
     function calculateProtocolRake(uint256 _betAmount, uint256 _protocolFee) public pure returns (uint256) {
         return _betAmount * _protocolFee / 10000;
+    }
+
+    function getProtocolFeeDepositAddress() public view returns (address) {
+        return s_prtocolFeeDepositAddress;
     }
 }
