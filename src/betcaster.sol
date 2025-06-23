@@ -167,6 +167,14 @@ contract Betcaster is Ownable {
         return s_betManagementEngine;
     }
 
+    function getArbiterManagementEngine() public view returns (address) {
+        return s_arbiterManagementEngine;
+    }
+
+    function getPauseStatus() public view returns (bool) {
+        return s_protocolPaused;
+    }
+
     function getEmergencyCancelCooldown() public view returns (uint256) {
         return s_emergencyCancelCooldown;
     }
