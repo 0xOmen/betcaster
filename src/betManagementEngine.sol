@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
@@ -30,6 +30,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
     error BetManagementEngine__BetAmountMismatch();
     error BetManagementEngine__TakerCannotBeArbiterOrMaker();
     error BetManagementEngine__BetTokenAddressCannotBeZeroAddress();
+    error BetManagementEngine__MakerCannotBeZeroAddress();
 
     address immutable i_betcaster;
 
@@ -68,6 +69,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
         uint256 _arbiterFee,
         string memory _betAgreement
     ) public {
+        if (msg.sender == address(0)) revert BetManagementEngine__MakerCannotBeZeroAddress();
         if (_betAmount <= 0) revert BetManagementEngine__BetAmountMustBeGreaterThanZero();
         if (_endTime <= block.timestamp) revert BetManagementEngine__EndTimeMustBeInTheFuture();
         if (_taker == msg.sender || _arbiter == msg.sender) {
@@ -126,7 +128,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
         if (bet.maker != msg.sender) revert BetManagementEngine__NotMaker();
         if (bet.status != BetTypes.Status.WAITING_FOR_TAKER) revert BetManagementEngine__BetNotWaitingForTaker();
         if (_endTime <= block.timestamp) revert BetManagementEngine__EndTimeMustBeInTheFuture();
-        if (_taker == msg.sender || _arbiter == msg.sender) {
+        if (_taker == msg.sender || _arbiter == msg.sender || _arbiter == _taker) {
             revert BetManagementEngine__TakerCannotBeArbiterOrMaker();
         }
         bet.taker = _taker;
