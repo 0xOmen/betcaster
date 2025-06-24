@@ -31,6 +31,7 @@ contract Betcaster is Ownable {
     bool private s_protocolPaused;
     uint256 public s_protocolFee;
     uint256 private s_betNumber;
+    uint256 public immutable FEE_PRECISION = 10000;
     mapping(uint256 => BetTypes.Bet) private s_allBets;
     address private s_betManagementEngine;
     address private s_arbiterManagementEngine;
@@ -95,7 +96,7 @@ contract Betcaster is Ownable {
     }
 
     function setProtocolFee(uint256 _protocolFee) public onlyOwner {
-        if (_protocolFee >= 10000) revert Betcaster__FeesCannotBeGreaterThan10000();
+        if (_protocolFee >= FEE_PRECISION) revert Betcaster__FeesCannotBeGreaterThan10000();
         s_protocolFee = _protocolFee;
     }
 
@@ -110,7 +111,7 @@ contract Betcaster is Ownable {
 
     function createBet(uint256 _betNumber, BetTypes.Bet memory _bet) public onlyBetManagementEngine {
         if (_bet.betAmount == 0) revert Betcaster__BetAmountCannotBeZero();
-        if (_bet.arbiterFee + _bet.protocolFee >= 10000) revert Betcaster__FeesCannotBeGreaterThan10000();
+        if (_bet.arbiterFee + _bet.protocolFee >= FEE_PRECISION) revert Betcaster__FeesCannotBeGreaterThan10000();
         s_allBets[_betNumber] = _bet;
     }
 
@@ -184,11 +185,11 @@ contract Betcaster is Ownable {
     }
 
     function calculateArbiterPayment(uint256 _betAmount, uint256 _arbiterFee) public pure returns (uint256) {
-        return _betAmount * _arbiterFee / 10000;
+        return _betAmount * _arbiterFee / FEE_PRECISION;
     }
 
     function calculateProtocolRake(uint256 _betAmount, uint256 _protocolFee) public pure returns (uint256) {
-        return _betAmount * _protocolFee / 10000;
+        return _betAmount * _protocolFee / FEE_PRECISION;
     }
 
     function getProtocolFeeDepositAddress() public view returns (address) {
