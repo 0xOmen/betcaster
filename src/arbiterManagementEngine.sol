@@ -29,7 +29,7 @@ contract ArbiterManagementEngine is Ownable {
             revert ArbiterManagementEngine__BetNotWaitingForArbiter();
         }
         if (bet.arbiter == address(0)) {
-            if (bet.taker == msg.sender) {
+            if (bet.taker == msg.sender || bet.maker == msg.sender) {
                 revert ArbiterManagementEngine__TakerCannotBeArbiter();
             }
             Betcaster(s_betcaster).updateBetArbiter(_betNumber, msg.sender);
