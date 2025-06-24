@@ -214,15 +214,15 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
         }
         if (bet.status == BetTypes.Status.MAKER_WINS) {
             winner = bet.maker;
-            bet.status = BetTypes.Status.COMPLETED_MAKER_WINS;
+            Betcaster(i_betcaster).updateBetStatus(_betNumber, BetTypes.Status.COMPLETED_MAKER_WINS);
+            emit BetClaimed(_betNumber, winner, BetTypes.Status.COMPLETED_MAKER_WINS);
         } else if (bet.status == BetTypes.Status.TAKER_WINS) {
             winner = bet.taker;
-            bet.status = BetTypes.Status.COMPLETED_TAKER_WINS;
+            Betcaster(i_betcaster).updateBetStatus(_betNumber, BetTypes.Status.COMPLETED_TAKER_WINS);
+            emit BetClaimed(_betNumber, winner, BetTypes.Status.COMPLETED_TAKER_WINS);
         } else {
             revert BetManagementEngine__BetNotClaimable();
         }
-        emit BetClaimed(_betNumber, winner, bet.status);
-        Betcaster(i_betcaster).updateBetStatus(_betNumber, bet.status);
         //transfer protocol rake to owner
         address protocolFeeDepositAddress = Betcaster(i_betcaster).getProtocolFeeDepositAddress();
         Betcaster(i_betcaster).transferTokensToUser(protocolFeeDepositAddress, bet.betTokenAddress, protocolRake);
