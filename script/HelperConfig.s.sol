@@ -33,8 +33,7 @@ contract HelperConfig is Script {
         return NetworkConfig({weth: address(weth), deployerKey: DEFAULT_ANVIL_KEY});
     }
 
-    function getBaseConfig() public view returns (NetworkConfig memory) {
-        return
-            NetworkConfig({weth: address(0x4200000000000000000000000000000000000006), deployerKey: DEFAULT_ANVIL_KEY});
+    function getBaseConfig() public pure returns (NetworkConfig memory) {
+        return NetworkConfig({weth: address(0x4200000000000000000000000000000000000006), deployerKey: 0});
     }
 }
