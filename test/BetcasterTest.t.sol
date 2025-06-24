@@ -81,7 +81,7 @@ contract BetcasterTest is Test {
         betManagementEngine.acceptBet(1);
 
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
 
         vm.warp(block.timestamp + 1 days);
     }
@@ -263,7 +263,7 @@ contract BetcasterTest is Test {
         vm.prank(owner);
         betcaster.pauseProtocol();
 
-        vm.warp(block.timestamp + 1 hours);
+        vm.warp(block.timestamp + 1 days);
 
         vm.expectRevert(Betcaster.Betcaster__ProtocolPaused.selector);
         vm.prank(taker);
@@ -271,13 +271,13 @@ contract BetcasterTest is Test {
 
         vm.expectRevert(Betcaster.Betcaster__ProtocolPaused.selector);
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(2);
+        arbiterManagementEngine.ArbiterAcceptRole(2);
 
         vm.prank(owner);
         betcaster.unpauseProtocol();
 
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(2);
+        arbiterManagementEngine.ArbiterAcceptRole(2);
 
         vm.prank(owner);
         betcaster.pauseProtocol();

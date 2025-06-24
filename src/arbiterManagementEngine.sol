@@ -14,7 +14,7 @@ contract ArbiterManagementEngine is Ownable {
     error ArbiterManagementEngine__TakerCannotBeArbiter();
     error ArbiterManagementEngine__NotOnAllowList();
 
-    address private s_betcaster;
+    address private immutable i_betcaster;
     mapping(address => bool) private s_allowList;
     bool private s_enforceAllowList;
 
@@ -24,12 +24,12 @@ contract ArbiterManagementEngine is Ownable {
     event AllowListEnforcementUpdated(bool indexed enforced);
 
     constructor(address _betcaster) Ownable(msg.sender) {
-        s_betcaster = _betcaster;
+        i_betcaster = _betcaster;
         s_enforceAllowList = false; // Default to not enforcing allowlist
     }
 
-    function AribiterAcceptRole(uint256 _betNumber) public {
-        BetTypes.Bet memory bet = Betcaster(s_betcaster).getBet(_betNumber);
+    function ArbiterAcceptRole(uint256 _betNumber) public {
+        BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
         if (bet.status != BetTypes.Status.WAITING_FOR_ARBITER) {
             revert ArbiterManagementEngine__BetNotWaitingForArbiter();
         }
@@ -41,16 +41,16 @@ contract ArbiterManagementEngine is Ownable {
             if (s_enforceAllowList && !s_allowList[msg.sender]) {
                 revert ArbiterManagementEngine__NotOnAllowList();
             }
-            Betcaster(s_betcaster).updateBetArbiter(_betNumber, msg.sender);
+            Betcaster(i_betcaster).updateBetArbiter(_betNumber, msg.sender);
         } else if (bet.arbiter != msg.sender) {
             revert ArbiterManagementEngine__NotArbiter();
         }
         emit ArbiterAcceptedRole(_betNumber, msg.sender);
-        Betcaster(s_betcaster).arbiterUpdateBetStatus(_betNumber, BetTypes.Status.IN_PROCESS);
+        Betcaster(i_betcaster).arbiterUpdateBetStatus(_betNumber, BetTypes.Status.IN_PROCESS);
     }
 
     function selectWinner(uint256 _betNumber, address _winner) public {
-        BetTypes.Bet memory bet = Betcaster(s_betcaster).getBet(_betNumber);
+        BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
         if (bet.status != BetTypes.Status.IN_PROCESS) {
             revert ArbiterManagementEngine__BetNotInProcess();
         }
@@ -61,16 +61,16 @@ contract ArbiterManagementEngine is Ownable {
             revert ArbiterManagementEngine__NotArbiter();
         }
         if (bet.maker == _winner) {
-            Betcaster(s_betcaster).arbiterUpdateBetStatus(_betNumber, BetTypes.Status.MAKER_WINS);
+            Betcaster(i_betcaster).arbiterUpdateBetStatus(_betNumber, BetTypes.Status.MAKER_WINS);
             emit WinnerSelected(_betNumber, _winner);
         } else if (bet.taker == _winner) {
-            Betcaster(s_betcaster).arbiterUpdateBetStatus(_betNumber, BetTypes.Status.TAKER_WINS);
+            Betcaster(i_betcaster).arbiterUpdateBetStatus(_betNumber, BetTypes.Status.TAKER_WINS);
             emit WinnerSelected(_betNumber, _winner);
         } else {
             revert ArbiterManagementEngine__WinnerNotValid();
         }
-        uint256 arbiterPayment = Betcaster(s_betcaster).calculateArbiterPayment(2 * bet.betAmount, bet.arbiterFee);
-        Betcaster(s_betcaster).transferTokensToArbiter(arbiterPayment, bet.arbiter, bet.betTokenAddress);
+        uint256 arbiterPayment = Betcaster(i_betcaster).calculateArbiterPayment(2 * bet.betAmount, bet.arbiterFee);
+        Betcaster(i_betcaster).transferTokensToArbiter(arbiterPayment, bet.arbiter, bet.betTokenAddress);
     }
 
     // Allowlist management functions

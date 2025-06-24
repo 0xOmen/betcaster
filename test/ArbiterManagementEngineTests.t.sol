@@ -94,7 +94,7 @@ contract ArbiterManagementEngineTest is Test {
     function _setupBetInProcess() internal {
         _setupBetForArbiter();
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -109,7 +109,7 @@ contract ArbiterManagementEngineTest is Test {
         emit ArbiterAcceptedRole(1, arbiter);
 
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
 
         assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.IN_PROCESS));
         assertEq(betcaster.getBet(1).arbiter, arbiter);
@@ -119,7 +119,7 @@ contract ArbiterManagementEngineTest is Test {
         // Bet is still WAITING_FOR_TAKER
         vm.expectRevert(ArbiterManagementEngine.ArbiterManagementEngine__BetNotWaitingForArbiter.selector);
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
     }
 
     function testArbiterAcceptRole_RevertWhen_WrongArbiter() public {
@@ -127,7 +127,7 @@ contract ArbiterManagementEngineTest is Test {
 
         vm.expectRevert(ArbiterManagementEngine.ArbiterManagementEngine__NotArbiter.selector);
         vm.prank(user1); // Wrong arbiter
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
     }
 
     function testArbiterAcceptRole_WithZeroAddressArbiter() public {
@@ -151,7 +151,7 @@ contract ArbiterManagementEngineTest is Test {
         emit ArbiterAcceptedRole(2, user1);
 
         vm.prank(user1);
-        arbiterManagementEngine.AribiterAcceptRole(2);
+        arbiterManagementEngine.ArbiterAcceptRole(2);
 
         assertEq(uint256(betcaster.getBet(2).status), uint256(BetTypes.Status.IN_PROCESS));
         assertEq(betcaster.getBet(2).arbiter, user1);
@@ -250,7 +250,7 @@ contract ArbiterManagementEngineTest is Test {
 
         // 2. Arbiter accepts role
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
         assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.IN_PROCESS));
 
         // 3. Time passes
@@ -274,7 +274,7 @@ contract ArbiterManagementEngineTest is Test {
 
         // 2. Arbiter accepts role
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
 
         // 3. Time passes
         vm.warp(block.timestamp + 2 days);
@@ -317,7 +317,7 @@ contract ArbiterManagementEngineTest is Test {
         betManagementEngine.acceptBet(2);
 
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(2);
+        arbiterManagementEngine.ArbiterAcceptRole(2);
 
         // Warp time and select winner
         vm.warp(block.timestamp + 2 days);
@@ -346,7 +346,7 @@ contract ArbiterManagementEngineTest is Test {
         betManagementEngine.acceptBet(2);
 
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(2);
+        arbiterManagementEngine.ArbiterAcceptRole(2);
 
         vm.warp(block.timestamp + 2 days);
 
@@ -376,7 +376,7 @@ contract ArbiterManagementEngineTest is Test {
         uint256 betcasterStartingBalance = mockToken.balanceOf(address(betcaster));
 
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(2);
+        arbiterManagementEngine.ArbiterAcceptRole(2);
 
         vm.warp(block.timestamp + 2 days);
 
@@ -473,7 +473,7 @@ contract ArbiterManagementEngineTest is Test {
         emit ArbiterAcceptedRole(2, user1);
 
         vm.prank(user1);
-        arbiterManagementEngine.AribiterAcceptRole(2);
+        arbiterManagementEngine.ArbiterAcceptRole(2);
 
         assertEq(uint256(betcaster.getBet(2).status), uint256(BetTypes.Status.IN_PROCESS));
         assertEq(betcaster.getBet(2).arbiter, user1);
@@ -505,7 +505,7 @@ contract ArbiterManagementEngineTest is Test {
         // user1 should not be able to accept arbiter role (not on allowlist)
         vm.expectRevert(ArbiterManagementEngine.ArbiterManagementEngine__NotOnAllowList.selector);
         vm.prank(user1);
-        arbiterManagementEngine.AribiterAcceptRole(2);
+        arbiterManagementEngine.ArbiterAcceptRole(2);
     }
 
     function testArbiterAcceptRole_WithAllowListNotEnforced() public {
@@ -533,7 +533,7 @@ contract ArbiterManagementEngineTest is Test {
         emit ArbiterAcceptedRole(2, user1);
 
         vm.prank(user1);
-        arbiterManagementEngine.AribiterAcceptRole(2);
+        arbiterManagementEngine.ArbiterAcceptRole(2);
 
         assertEq(uint256(betcaster.getBet(2).status), uint256(BetTypes.Status.IN_PROCESS));
         assertEq(betcaster.getBet(2).arbiter, user1);
@@ -565,7 +565,7 @@ contract ArbiterManagementEngineTest is Test {
         emit ArbiterAcceptedRole(2, user2);
 
         vm.prank(user2);
-        arbiterManagementEngine.AribiterAcceptRole(2);
+        arbiterManagementEngine.ArbiterAcceptRole(2);
 
         assertEq(uint256(betcaster.getBet(2).status), uint256(BetTypes.Status.IN_PROCESS));
         assertEq(betcaster.getBet(2).arbiter, user2);
@@ -597,7 +597,7 @@ contract ArbiterManagementEngineTest is Test {
         emit ArbiterAcceptedRole(2, user1);
 
         vm.prank(user1);
-        arbiterManagementEngine.AribiterAcceptRole(2);
+        arbiterManagementEngine.ArbiterAcceptRole(2);
 
         assertEq(uint256(betcaster.getBet(2).status), uint256(BetTypes.Status.IN_PROCESS));
         assertEq(betcaster.getBet(2).arbiter, user1);
@@ -671,11 +671,11 @@ contract ArbiterManagementEngineTest is Test {
         // user2 should not be able to accept role (not on allowlist)
         vm.expectRevert(ArbiterManagementEngine.ArbiterManagementEngine__NotOnAllowList.selector);
         vm.prank(user2);
-        arbiterManagementEngine.AribiterAcceptRole(2);
+        arbiterManagementEngine.ArbiterAcceptRole(2);
 
         // user1 should be able to accept role
         vm.prank(user1);
-        arbiterManagementEngine.AribiterAcceptRole(2);
+        arbiterManagementEngine.ArbiterAcceptRole(2);
 
         // Disable allowlist enforcement
         vm.prank(owner); // owner
@@ -685,6 +685,6 @@ contract ArbiterManagementEngineTest is Test {
         // But bet is already in process, so it should revert
         vm.expectRevert(ArbiterManagementEngine.ArbiterManagementEngine__BetNotWaitingForArbiter.selector);
         vm.prank(user2);
-        arbiterManagementEngine.AribiterAcceptRole(2);
+        arbiterManagementEngine.ArbiterAcceptRole(2);
     }
 }

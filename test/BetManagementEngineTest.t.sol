@@ -388,7 +388,7 @@ contract BetManagementEngineTest is Test {
         assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.WAITING_FOR_ARBITER));
 
         // Fast forward time past cooldown (1 hour)
-        vm.warp(block.timestamp + 2 hours);
+        vm.warp(block.timestamp + 2 days);
 
         uint256 makerBalanceBefore = mockToken.balanceOf(maker);
         uint256 takerBalanceBefore = mockToken.balanceOf(taker);
@@ -427,7 +427,7 @@ contract BetManagementEngineTest is Test {
         betManagementEngine.acceptBet(1);
 
         // Fast forward time past cooldown
-        vm.warp(block.timestamp + 2 hours);
+        vm.warp(block.timestamp + 2 days);
 
         uint256 makerBalanceBefore = mockToken.balanceOf(maker);
         uint256 takerBalanceBefore = mockToken.balanceOf(taker);
@@ -595,7 +595,7 @@ contract BetManagementEngineTest is Test {
 
         // Arbiter accepts role
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
 
         // Warp to after end time
         vm.warp(block.timestamp + 2 days);
@@ -623,7 +623,7 @@ contract BetManagementEngineTest is Test {
 
         // Arbiter accepts role
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
 
         // Warp to after end time
         vm.warp(block.timestamp + 2 days);
@@ -733,7 +733,7 @@ contract BetManagementEngineTest is Test {
         betManagementEngine.acceptBet(1);
 
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
 
         // Try to claim bet that's still IN_PROCESS
         vm.expectRevert(BetManagementEngine.BetManagementEngine__BetNotClaimable.selector);
@@ -786,7 +786,7 @@ contract BetManagementEngineTest is Test {
         betManagementEngine.acceptBet(1);
 
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
 
         vm.warp(block.timestamp + 2 days);
 
@@ -823,7 +823,7 @@ contract BetManagementEngineTest is Test {
         betManagementEngine.acceptBet(1);
 
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
 
         vm.warp(block.timestamp + 2 days);
 
@@ -884,7 +884,7 @@ contract BetManagementEngineTest is Test {
         betManagementEngine.acceptBet(1);
 
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
 
         vm.warp(block.timestamp + 2 days);
 
@@ -934,7 +934,7 @@ contract BetManagementEngineTest is Test {
 
         // 3. Arbiter accepts role
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
 
         // 4. Time passes
         vm.warp(block.timestamp + 2 days);
@@ -983,7 +983,7 @@ contract BetManagementEngineTest is Test {
 
         // Arbiter accepts role
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
 
         return 1;
     }
@@ -1124,7 +1124,7 @@ contract BetManagementEngineTest is Test {
         betManagementEngine.acceptBet(1);
 
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
 
         // Verify high arbiter fee is set
         assertEq(betcaster.getBet(1).arbiterFee, highArbiterFee);
@@ -1163,7 +1163,7 @@ contract BetManagementEngineTest is Test {
 
         // 3. Arbiter accepts role
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
 
         // 4. Maker forfeits
         vm.prank(maker);
@@ -1209,7 +1209,7 @@ contract BetManagementEngineTest is Test {
 
         // 3. Arbiter accepts role
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
 
         // 4. Taker forfeits
         vm.prank(taker);
@@ -1255,9 +1255,9 @@ contract BetManagementEngineTest is Test {
         betManagementEngine.acceptBet(2);
 
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(2);
+        arbiterManagementEngine.ArbiterAcceptRole(2);
 
         // First bet: forfeit
         vm.prank(maker);
@@ -1309,7 +1309,7 @@ contract BetManagementEngineTest is Test {
         betManagementEngine.acceptBet(1);
 
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
 
         // Verify arbiter fee is already zero
         assertEq(betcaster.getBet(1).arbiterFee, 0);
@@ -1375,7 +1375,7 @@ contract BetManagementEngineTest is Test {
         betManagementEngine.acceptBet(1);
 
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
 
         // Verify initial arbiter fee
         assertEq(betcaster.getBet(1).arbiterFee, arbiterFeePercent);
@@ -1423,7 +1423,7 @@ contract BetManagementEngineTest is Test {
 
         // Arbiter accepts role (bet becomes IN_PROCESS)
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
 
         return 1;
     }
@@ -1701,7 +1701,7 @@ contract BetManagementEngineTest is Test {
 
         // 3. Arbiter accepts role
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
 
         // 4. Time passes beyond bet end time + cooldown
         vm.warp(endTime + 1 hours + 1 minutes);
@@ -1746,7 +1746,7 @@ contract BetManagementEngineTest is Test {
 
         // Only first bet gets arbiter
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
 
         // First bet: emergency cancel (IN_PROCESS)
         vm.warp(endTime + 2 hours + 1 minutes);
@@ -1902,7 +1902,7 @@ contract BetManagementEngineTest is Test {
         betManagementEngine.acceptBet(1);
 
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
 
         // Warp past cooldown
         vm.warp(endTime + 1 hours + 1 minutes);
@@ -1944,7 +1944,7 @@ contract BetManagementEngineTest is Test {
 
         // 3. Arbiter accepts role
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
 
         // 4. Time passes
         vm.warp(block.timestamp + 2 days);
@@ -2001,7 +2001,7 @@ contract BetManagementEngineTest is Test {
 
         // 3. Arbiter accepts role
         vm.prank(arbiter);
-        arbiterManagementEngine.AribiterAcceptRole(1);
+        arbiterManagementEngine.ArbiterAcceptRole(1);
 
         // 4. Time passes
         vm.warp(block.timestamp + 2 days);
