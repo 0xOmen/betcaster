@@ -156,6 +156,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
 
     /**
      * @notice Allows Taker to accept bet.  If bet.taker is address(0), it assigns taker to msg.sender.
+     * Zero transfer amount does not need to be checked because it is already checked at bet creation and cannot be changed.
      * @param _betNumber The number of the bet to accept
      */
     function acceptBet(uint256 _betNumber) public {

@@ -189,6 +189,14 @@ contract Betcaster is Ownable {
         return s_emergencyCancelCooldown;
     }
 
+    /**
+     * At very small _betAmounts, the precision loss can be significant.
+     * These functions are used to calculate the arbiter payment and protocol rake.
+     * It is important to note that the precision loss is not a problem for the bet amount,
+     * but it is a problem for the arbiter payment and protocol rake.
+     * This is because the arbiter payment and protocol rake are calculated as a percentage of the bet amount.
+     * So if the bet amount is very small, the arbiter payment and protocol rake may round to zero.
+     */
     function calculateArbiterPayment(uint256 _betAmount, uint256 _arbiterFee) public pure returns (uint256) {
         return _betAmount * _arbiterFee / FEE_PRECISION;
     }
