@@ -95,6 +95,7 @@ contract Betcaster is Ownable {
     }
 
     function setProtocolFee(uint256 _protocolFee) public onlyOwner {
+        if (_protocolFee >= 10000) revert Betcaster__FeesCannotBeGreaterThan10000();
         s_protocolFee = _protocolFee;
     }
 
