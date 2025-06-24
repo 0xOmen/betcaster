@@ -20,8 +20,8 @@ contract ArbiterManagementEngine is Ownable {
 
     event ArbiterAcceptedRole(uint256 indexed betNumber, address indexed arbiter);
     event WinnerSelected(uint256 indexed betNumber, address indexed winner);
-    event AllowListUpdated(address indexed address_, bool allowed);
-    event AllowListEnforcementUpdated(bool enforced);
+    event AllowListUpdated(address indexed address_, bool indexed allowed);
+    event AllowListEnforcementUpdated(bool indexed enforced);
 
     constructor(address _betcaster) Ownable(msg.sender) {
         s_betcaster = _betcaster;

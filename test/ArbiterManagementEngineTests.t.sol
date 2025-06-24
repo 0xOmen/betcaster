@@ -8,6 +8,7 @@ import {ERC20Mock} from "lib/openzeppelin-contracts/contracts/mocks/token/ERC20M
 import {BetTypes} from "../src/BetTypes.sol";
 import {DeployBetcaster} from "../script/DeployBetcaster.s.sol";
 import {ArbiterManagementEngine} from "../src/arbiterManagementEngine.sol";
+import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 contract ArbiterManagementEngineTest is Test {
     Betcaster public betcaster;
@@ -21,6 +22,7 @@ contract ArbiterManagementEngineTest is Test {
     address public arbiter = makeAddr("arbiter");
     address public user1 = makeAddr("user1");
     address public user2 = makeAddr("user2");
+    address public owner;
 
     // Test constants
     uint256 public constant PROTOCOL_FEE = 100; // 1%
@@ -36,6 +38,8 @@ contract ArbiterManagementEngineTest is Test {
     event Transfer(address indexed from, address indexed to, uint256 value);
     event ArbiterAcceptedRole(uint256 indexed betNumber, address indexed arbiter);
     event WinnerSelected(uint256 indexed betNumber, address indexed winner);
+    event AllowListUpdated(address indexed address_, bool indexed allowed);
+    event AllowListEnforcementUpdated(bool indexed isAllowListEnforced);
 
     function setUp() public {
         // Deploy contracts
@@ -43,6 +47,8 @@ contract ArbiterManagementEngineTest is Test {
         address wethTokenAddr;
         (betcaster, betManagementEngine, arbiterManagementEngine, wethTokenAddr) = deployer.run();
         mockToken = new ERC20Mock();
+
+        owner = arbiterManagementEngine.owner();
 
         // Mint tokens to test addresses
         mockToken.mint(maker, INITIAL_TOKEN_SUPPLY);
@@ -382,5 +388,303 @@ contract ArbiterManagementEngineTest is Test {
 
         assertEq(mockToken.balanceOf(arbiter), arbiterBalanceBefore + expectedFee);
         assertEq(mockToken.balanceOf(address(betcaster)), betcasterStartingBalance - expectedFee); // Verify balance of Betcaster contract
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        ALLOWLIST TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testAllowList_DefaultState() public view {
+        // By default, allowlist should not be enforced
+        assertEq(arbiterManagementEngine.isAllowListEnforced(), false);
+
+        // Any address should not be on allowlist by default
+        assertEq(arbiterManagementEngine.isOnAllowList(user1), false);
+        assertEq(arbiterManagementEngine.isOnAllowList(user2), false);
+        assertEq(arbiterManagementEngine.isOnAllowList(arbiter), false);
+    }
+
+    function testSetAllowListStatus() public {
+        // Test adding address to allowlist
+        vm.prank(owner);
+        arbiterManagementEngine.setAllowListStatus(user1, true);
+        assertEq(arbiterManagementEngine.isOnAllowList(user1), true);
+        assertEq(arbiterManagementEngine.isOnAllowList(user2), false);
+
+        // Test removing address from allowlist
+        vm.prank(owner); // owner
+        arbiterManagementEngine.setAllowListStatus(user1, false);
+        assertEq(arbiterManagementEngine.isOnAllowList(user1), false);
+    }
+
+    function testSetAllowListStatus_OnlyOwner() public {
+        // Non-owner should not be able to set allowlist status
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1));
+        vm.prank(user1);
+        arbiterManagementEngine.setAllowListStatus(user2, true);
+    }
+
+    function testSetAllowListEnforcement() public {
+        // Test enabling allowlist enforcement
+        vm.prank(owner); // owner
+        arbiterManagementEngine.setAllowListEnforcement(true);
+        assertEq(arbiterManagementEngine.isAllowListEnforced(), true);
+
+        // Test disabling allowlist enforcement
+        vm.prank(owner); // owner
+        arbiterManagementEngine.setAllowListEnforcement(false);
+        assertEq(arbiterManagementEngine.isAllowListEnforced(), false);
+    }
+
+    function testSetAllowListEnforcement_OnlyOwner() public {
+        // Non-owner should not be able to set enforcement
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1));
+        vm.prank(user1);
+        arbiterManagementEngine.setAllowListEnforcement(true);
+    }
+
+    function testArbiterAcceptRole_WithAllowListEnforced_AddressOnAllowList() public {
+        // Enable allowlist enforcement
+        vm.prank(owner); // owner
+        arbiterManagementEngine.setAllowListEnforcement(true);
+
+        // Add user1 to allowlist
+        vm.prank(owner); // owner
+        arbiterManagementEngine.setAllowListStatus(user1, true);
+
+        // Create bet with zero address arbiter
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker,
+            address(0), // zero address arbiter
+            address(mockToken),
+            BET_AMOUNT,
+            block.timestamp + 1 days,
+            PROTOCOL_FEE,
+            ARBITER_FEE,
+            BET_AGREEMENT
+        );
+
+        vm.prank(taker);
+        betManagementEngine.acceptBet(2);
+
+        // user1 should be able to accept arbiter role (on allowlist)
+        vm.expectEmit(true, true, false, false);
+        emit ArbiterAcceptedRole(2, user1);
+
+        vm.prank(user1);
+        arbiterManagementEngine.AribiterAcceptRole(2);
+
+        assertEq(uint256(betcaster.getBet(2).status), uint256(BetTypes.Status.IN_PROCESS));
+        assertEq(betcaster.getBet(2).arbiter, user1);
+    }
+
+    function testArbiterAcceptRole_WithAllowListEnforced_AddressNotOnAllowList() public {
+        // Enable allowlist enforcement
+        vm.prank(owner); // owner
+        arbiterManagementEngine.setAllowListEnforcement(true);
+
+        // user1 is not on allowlist
+
+        // Create bet with zero address arbiter
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker,
+            address(0), // zero address arbiter
+            address(mockToken),
+            BET_AMOUNT,
+            block.timestamp + 1 days,
+            PROTOCOL_FEE,
+            ARBITER_FEE,
+            BET_AGREEMENT
+        );
+
+        vm.prank(taker);
+        betManagementEngine.acceptBet(2);
+
+        // user1 should not be able to accept arbiter role (not on allowlist)
+        vm.expectRevert(ArbiterManagementEngine.ArbiterManagementEngine__NotOnAllowList.selector);
+        vm.prank(user1);
+        arbiterManagementEngine.AribiterAcceptRole(2);
+    }
+
+    function testArbiterAcceptRole_WithAllowListNotEnforced() public {
+        // Keep allowlist enforcement disabled (default state)
+        assertEq(arbiterManagementEngine.isAllowListEnforced(), false);
+
+        // Create bet with zero address arbiter
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker,
+            address(0), // zero address arbiter
+            address(mockToken),
+            BET_AMOUNT,
+            block.timestamp + 1 days,
+            PROTOCOL_FEE,
+            ARBITER_FEE,
+            BET_AGREEMENT
+        );
+
+        vm.prank(taker);
+        betManagementEngine.acceptBet(2);
+
+        // Any address should be able to accept arbiter role when allowlist is not enforced
+        vm.expectEmit(true, true, false, false);
+        emit ArbiterAcceptedRole(2, user1);
+
+        vm.prank(user1);
+        arbiterManagementEngine.AribiterAcceptRole(2);
+
+        assertEq(uint256(betcaster.getBet(2).status), uint256(BetTypes.Status.IN_PROCESS));
+        assertEq(betcaster.getBet(2).arbiter, user1);
+    }
+
+    function testArbiterAcceptRole_WithSpecificArbiter_AllowListNotEnforced() public {
+        // Enable allowlist enforcement
+        vm.prank(owner); // owner
+        arbiterManagementEngine.setAllowListEnforcement(false);
+
+        // user1 is not on allowlist, but bet has specific arbiter (user2)
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker,
+            user2, // specific arbiter
+            address(mockToken),
+            BET_AMOUNT,
+            block.timestamp + 1 days,
+            PROTOCOL_FEE,
+            ARBITER_FEE,
+            BET_AGREEMENT
+        );
+
+        vm.prank(taker);
+        betManagementEngine.acceptBet(2);
+
+        // user2 should be able to accept arbiter role (specific arbiter, allowlist doesn't apply)
+        vm.expectEmit(true, true, false, false);
+        emit ArbiterAcceptedRole(2, user2);
+
+        vm.prank(user2);
+        arbiterManagementEngine.AribiterAcceptRole(2);
+
+        assertEq(uint256(betcaster.getBet(2).status), uint256(BetTypes.Status.IN_PROCESS));
+        assertEq(betcaster.getBet(2).arbiter, user2);
+    }
+
+    function testArbiterAcceptRole_WithSpecificArbiter_AllowListEnforced() public {
+        // Enable allowlist enforcement
+        vm.prank(owner); // owner
+        arbiterManagementEngine.setAllowListEnforcement(true);
+
+        // user1 is not on allowlist, but bet has specific arbiter (user1)
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker,
+            user1, // specific arbiter
+            address(mockToken),
+            BET_AMOUNT,
+            block.timestamp + 1 days,
+            PROTOCOL_FEE,
+            ARBITER_FEE,
+            BET_AGREEMENT
+        );
+
+        vm.prank(taker);
+        betManagementEngine.acceptBet(2);
+
+        // user1 should be able to accept arbiter role (specific arbiter, allowlist doesn't apply)
+        vm.expectEmit(true, true, false, false);
+        emit ArbiterAcceptedRole(2, user1);
+
+        vm.prank(user1);
+        arbiterManagementEngine.AribiterAcceptRole(2);
+
+        assertEq(uint256(betcaster.getBet(2).status), uint256(BetTypes.Status.IN_PROCESS));
+        assertEq(betcaster.getBet(2).arbiter, user1);
+    }
+
+    function testAllowListEvents() public {
+        // Test AllowListUpdated event
+        vm.expectEmit(true, false, false, false);
+        emit AllowListUpdated(user1, true);
+
+        vm.prank(owner); // owner
+        arbiterManagementEngine.setAllowListStatus(user1, true);
+
+        // Test AllowListEnforcementUpdated event
+        vm.expectEmit(false, false, false, false);
+        emit AllowListEnforcementUpdated(true);
+
+        vm.prank(owner); // owner
+        arbiterManagementEngine.setAllowListEnforcement(true);
+    }
+
+    function testAllowList_EdgeCases() public {
+        // Test with zero address
+        vm.prank(owner); // owner
+        arbiterManagementEngine.setAllowListStatus(address(0), true);
+        assertEq(arbiterManagementEngine.isOnAllowList(address(0)), true);
+
+        // Test with contract address
+        vm.prank(owner); // owner
+        arbiterManagementEngine.setAllowListStatus(address(mockToken), true);
+        assertEq(arbiterManagementEngine.isOnAllowList(address(mockToken)), true);
+
+        // Test multiple addresses
+        vm.prank(owner); // owner
+        arbiterManagementEngine.setAllowListStatus(user1, true);
+        vm.prank(owner); // owner
+        arbiterManagementEngine.setAllowListStatus(user2, true);
+        vm.prank(owner); // owner
+        arbiterManagementEngine.setAllowListStatus(arbiter, false);
+
+        assertEq(arbiterManagementEngine.isOnAllowList(user1), true);
+        assertEq(arbiterManagementEngine.isOnAllowList(user2), true);
+        assertEq(arbiterManagementEngine.isOnAllowList(arbiter), false);
+    }
+
+    function testAllowList_IntegrationWithExistingBet() public {
+        // Enable allowlist enforcement
+        vm.prank(owner); // owner
+        arbiterManagementEngine.setAllowListEnforcement(true);
+
+        // Add user1 to allowlist
+        vm.prank(owner); // owner
+        arbiterManagementEngine.setAllowListStatus(user1, true);
+
+        // Create bet with zero address arbiter
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker,
+            address(0), // zero address arbiter
+            address(mockToken),
+            BET_AMOUNT,
+            block.timestamp + 1 days,
+            PROTOCOL_FEE,
+            ARBITER_FEE,
+            BET_AGREEMENT
+        );
+
+        vm.prank(taker);
+        betManagementEngine.acceptBet(2);
+
+        // user2 should not be able to accept role (not on allowlist)
+        vm.expectRevert(ArbiterManagementEngine.ArbiterManagementEngine__NotOnAllowList.selector);
+        vm.prank(user2);
+        arbiterManagementEngine.AribiterAcceptRole(2);
+
+        // user1 should be able to accept role
+        vm.prank(user1);
+        arbiterManagementEngine.AribiterAcceptRole(2);
+
+        // Disable allowlist enforcement
+        vm.prank(owner); // owner
+        arbiterManagementEngine.setAllowListEnforcement(false);
+
+        // Now user2 should be able to accept role
+        // But bet is already in process, so it should revert
+        vm.expectRevert(ArbiterManagementEngine.ArbiterManagementEngine__BetNotWaitingForArbiter.selector);
+        vm.prank(user2);
+        arbiterManagementEngine.AribiterAcceptRole(2);
     }
 }
