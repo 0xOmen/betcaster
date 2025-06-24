@@ -1920,6 +1920,59 @@ contract BetManagementEngineTest is Test {
         assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.CANCELLED));
     }
 
+    function testFuzz_PrecisionLossWithSmallBetSize(uint256 betAmount) public {
+        // Bound bet amount to reasonable range
+        betAmount = bound(betAmount, 1, 100);
+
+        uint256 endTime = block.timestamp + 1 days;
+
+        // Track initial balances
+        uint256 makerInitialBalance = mockToken.balanceOf(maker);
+        uint256 takerInitialBalance = mockToken.balanceOf(taker);
+        uint256 arbiterInitialBalance = mockToken.balanceOf(arbiter);
+        uint256 ownerInitialBalance = mockToken.balanceOf(betManagementEngine.owner());
+
+        // 1. Create bet
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker, arbiter, address(mockToken), betAmount, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
+        );
+
+        // 2. Accept bet
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        // 3. Arbiter accepts role
+        vm.prank(arbiter);
+        arbiterManagementEngine.AribiterAcceptRole(1);
+
+        // 4. Time passes
+        vm.warp(block.timestamp + 2 days);
+
+        // 5. Arbiter selects winner
+        vm.prank(arbiter);
+        arbiterManagementEngine.selectWinner(1, maker);
+
+        // 6. Claim bet
+        vm.prank(user1);
+        betManagementEngine.claimBet(1);
+
+        // Calculate expected final balances
+        uint256 totalBetAmount = betAmount * 2;
+        uint256 protocolRake = totalBetAmount * PROTOCOL_FEE / 10000;
+        uint256 arbiterPayment = totalBetAmount * ARBITER_FEE / 10000;
+        uint256 winnerTake = totalBetAmount - protocolRake - arbiterPayment;
+
+        // Verify final balances
+        assertEq(mockToken.balanceOf(maker), makerInitialBalance - betAmount + winnerTake);
+        assertEq(mockToken.balanceOf(taker), takerInitialBalance - betAmount);
+        assertEq(mockToken.balanceOf(arbiter), arbiterInitialBalance + arbiterPayment);
+        assertEq(mockToken.balanceOf(betManagementEngine.owner()), ownerInitialBalance + protocolRake);
+
+        // Verify bet status
+        assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.COMPLETED_MAKER_WINS));
+    }
+
     /*//////////////////////////////////////////////////////////////
                   FUZZ TESTS VARIOUS TOKEN AMOUNTS
     //////////////////////////////////////////////////////////////*/
