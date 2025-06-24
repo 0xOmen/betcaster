@@ -36,8 +36,7 @@ deploy-base: build
 		--broadcast \
 		--verify \
 		--etherscan-api-key $(BASESCAN_API_KEY) \
-		--legacy-hdpath \
-		--hdpath "m/44'/60'/0'/0/0" \
+		--account deployer\
 		-vvvv
 
 # Base Sepolia Testnet Deployment with Trezor
@@ -47,8 +46,7 @@ deploy-base-sepolia: build
 		--broadcast \
 		--verify \
 		--etherscan-api-key $(BASESCAN_API_KEY) \
-		--legacy-hdpath \
-		--hdpath "m/44'/60'/0'/0/0" \
+		--account deployer \
 		-vvvv
 
 NETWORK_ARGS := --rpc-url http://localhost:8545 --private-key $(DEFAULT_ANVIL_KEY) --broadcast
