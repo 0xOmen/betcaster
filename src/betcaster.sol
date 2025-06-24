@@ -26,6 +26,7 @@ contract Betcaster is Ownable {
     error Betcaster__BetAmountCannotBeZero();
     error Betcaster__FeesCannotBeGreaterThan10000();
     error Betcaster__CannotBeZeroAddress();
+    error Betcaster__BetAmountMismatch();
 
     // State variables
     bool private s_protocolPaused;
@@ -146,7 +147,11 @@ contract Betcaster is Ownable {
         public
         onlyBetManagementEngine
     {
+        // Check that token amount deposited to the smart contract is the same as _betAmount and revert if not
+        uint256 balanceBefore = IERC20(_betTokenAddress).balanceOf(address(this));
         IERC20(_betTokenAddress).safeTransferFrom(_user, address(this), _betAmount);
+        uint256 balanceAfter = IERC20(_betTokenAddress).balanceOf(address(this));
+        if (balanceAfter - balanceBefore != _betAmount) revert Betcaster__BetAmountMismatch();
     }
 
     function transferTokensToArbiter(uint256 _amount, address _arbiter, address _betTokenAddress)
