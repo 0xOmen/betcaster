@@ -12,14 +12,20 @@ contract ArbiterManagementEngine is Ownable {
     error ArbiterManagementEngine__EndTimeNotReached();
     error ArbiterManagementEngine__WinnerNotValid();
     error ArbiterManagementEngine__TakerCannotBeArbiter();
+    error ArbiterManagementEngine__NotOnAllowList();
 
     address private s_betcaster;
+    mapping(address => bool) private s_allowList;
+    bool private s_enforceAllowList;
 
     event ArbiterAcceptedRole(uint256 indexed betNumber, address indexed arbiter);
     event WinnerSelected(uint256 indexed betNumber, address indexed winner);
+    event AllowListUpdated(address indexed address_, bool allowed);
+    event AllowListEnforcementUpdated(bool enforced);
 
     constructor(address _betcaster) Ownable(msg.sender) {
         s_betcaster = _betcaster;
+        s_enforceAllowList = false; // Default to not enforcing allowlist
     }
 
     function AribiterAcceptRole(uint256 _betNumber) public {
@@ -30,6 +36,10 @@ contract ArbiterManagementEngine is Ownable {
         if (bet.arbiter == address(0)) {
             if (bet.taker == msg.sender || bet.maker == msg.sender) {
                 revert ArbiterManagementEngine__TakerCannotBeArbiter();
+            }
+            // Check allowlist if enforcement is enabled
+            if (s_enforceAllowList && !s_allowList[msg.sender]) {
+                revert ArbiterManagementEngine__NotOnAllowList();
             }
             Betcaster(s_betcaster).updateBetArbiter(_betNumber, msg.sender);
         } else if (bet.arbiter != msg.sender) {
@@ -61,5 +71,25 @@ contract ArbiterManagementEngine is Ownable {
         }
         uint256 arbiterPayment = Betcaster(s_betcaster).calculateArbiterPayment(2 * bet.betAmount, bet.arbiterFee);
         Betcaster(s_betcaster).transferTokensToArbiter(arbiterPayment, bet.arbiter, bet.betTokenAddress);
+    }
+
+    // Allowlist management functions
+    function setAllowListStatus(address _address, bool _allowed) public onlyOwner {
+        s_allowList[_address] = _allowed;
+        emit AllowListUpdated(_address, _allowed);
+    }
+
+    function setAllowListEnforcement(bool _enforced) public onlyOwner {
+        s_enforceAllowList = _enforced;
+        emit AllowListEnforcementUpdated(_enforced);
+    }
+
+    // View functions
+    function isOnAllowList(address _address) public view returns (bool) {
+        return s_allowList[_address];
+    }
+
+    function isAllowListEnforced() public view returns (bool) {
+        return s_enforceAllowList;
     }
 }
