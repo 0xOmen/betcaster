@@ -16,7 +16,11 @@ contract HelperConfig is Script {
 
     constructor() {
         if (block.chainid == 31337) {
+            activeNetworkConfig = getAnvilConfig();
+        } else if (block.chainid == 8453) {
             activeNetworkConfig = getBaseConfig();
+        } else if (block.chainid == 84532) {
+            activeNetworkConfig = getBaseSepoliaConfig();
         } else {
             activeNetworkConfig = getOrCreateAnvilEthConfig();
         }
@@ -33,7 +37,17 @@ contract HelperConfig is Script {
         return NetworkConfig({weth: address(weth), deployerKey: DEFAULT_ANVIL_KEY});
     }
 
+    function getAnvilConfig() public pure returns (NetworkConfig memory) {
+        return NetworkConfig({weth: address(0), deployerKey: DEFAULT_ANVIL_KEY});
+    }
+
     function getBaseConfig() public pure returns (NetworkConfig memory) {
+        // Base mainnet WETH address
+        return NetworkConfig({weth: address(0x4200000000000000000000000000000000000006), deployerKey: 0});
+    }
+
+    function getBaseSepoliaConfig() public pure returns (NetworkConfig memory) {
+        // Base Sepolia WETH address
         return NetworkConfig({weth: address(0x4200000000000000000000000000000000000006), deployerKey: 0});
     }
 }

@@ -1,6 +1,6 @@
 -include .env
 
-.PHONY: all test clean deploy fund help install snapshot format anvil zktest
+.PHONY: all test clean deploy fund help install snapshot format anvil zktest deploy-base deploy-base-sepolia
 
 DEFAULT_ANVIL_KEY := 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
@@ -28,6 +28,28 @@ snapshot :; forge snapshot
 format :; forge fmt
 
 anvil :; anvil -m 'test test test test test test test test test test test junk' --steps-tracing --block-time 1
+
+# Base Mainnet Deployment with Trezor
+deploy-base: build
+	forge script script/DeployBetcaster.s.sol:DeployBetcaster \
+		--rpc-url $(BASE_RPC_URL) \
+		--broadcast \
+		--verify \
+		--etherscan-api-key $(BASESCAN_API_KEY) \
+		--legacy-hdpath \
+		--hdpath "m/44'/60'/0'/0/0" \
+		-vvvv
+
+# Base Sepolia Testnet Deployment with Trezor
+deploy-base-sepolia: build
+	forge script script/DeployBetcaster.s.sol:DeployBetcaster \
+		--rpc-url $(BASE_SEPOLIA_RPC) \
+		--broadcast \
+		--verify \
+		--etherscan-api-key $(BASESCAN_API_KEY) \
+		--legacy-hdpath \
+		--hdpath "m/44'/60'/0'/0/0" \
+		-vvvv
 
 NETWORK_ARGS := --rpc-url http://localhost:8545 --private-key $(DEFAULT_ANVIL_KEY) --broadcast
 
