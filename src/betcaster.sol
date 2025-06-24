@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {BetTypes} from "./BetTypes.sol";
 
@@ -17,6 +18,8 @@ import {BetTypes} from "./BetTypes.sol";
  * @dev This is the main contract that stores the state of every agreement.
  */
 contract Betcaster is Ownable {
+    using SafeERC20 for IERC20;
+
     error Betcaster__ProtocolPaused();
     error Betcaster__NotBetManagementEngine();
     error Betcaster__NotArbiterManagementEngine();
@@ -134,21 +137,21 @@ contract Betcaster is Ownable {
         public
         onlyBetManagementEngine
     {
-        ERC20(_betTokenAddress).transfer(_user, _betAmount);
+        IERC20(_betTokenAddress).safeTransfer(_user, _betAmount);
     }
 
     function depositToBetcaster(address _user, address _betTokenAddress, uint256 _betAmount)
         public
         onlyBetManagementEngine
     {
-        ERC20(_betTokenAddress).transferFrom(_user, address(this), _betAmount);
+        IERC20(_betTokenAddress).safeTransferFrom(_user, address(this), _betAmount);
     }
 
     function transferTokensToArbiter(uint256 _amount, address _arbiter, address _betTokenAddress)
         public
         onlyArbiterManagementEngine
     {
-        ERC20(_betTokenAddress).transfer(_arbiter, _amount);
+        IERC20(_betTokenAddress).safeTransfer(_arbiter, _amount);
     }
 
     // internal
