@@ -32,7 +32,7 @@ contract Betcaster is Ownable {
     bool private s_protocolPaused;
     uint256 public s_protocolFee;
     uint256 private s_betNumber;
-    uint256 public immutable FEE_PRECISION = 10000;
+    uint256 public constant FEE_PRECISION = 10000;
     mapping(uint256 => BetTypes.Bet) private s_allBets;
     address private s_betManagementEngine;
     address private s_arbiterManagementEngine;

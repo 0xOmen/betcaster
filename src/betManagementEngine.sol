@@ -169,6 +169,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
             Betcaster(i_betcaster).updateBetTaker(_betNumber, msg.sender);
         }
         if (bet.taker != msg.sender) revert BetManagementEngine__NotTaker();
+        if (block.timestamp > bet.endTime) revert BetManagementEngine__EndTimeMustBeInTheFuture();
         bet.status = BetTypes.Status.WAITING_FOR_ARBITER;
         Betcaster(i_betcaster).updateBetStatus(_betNumber, bet.status);
 
@@ -178,16 +179,16 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Allows Maker or Taker to cancel bet if no arbiter has been assigned.
+     * @notice Allows Maker or Taker to cancel bet if no arbiter accepts role.
      * Returns tokens to maker and taker with no fee.
-     * @notice Must wait 1 hour after bet is created to cancel.
+     * @notice Must wait 1 day after bet is created to cancel.
      * @param _betNumber The number of the bet to cancel
      */
     function noArbiterCancelBet(uint256 _betNumber) public nonReentrant {
         BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
         if (bet.maker != msg.sender && bet.taker != msg.sender) revert BetManagementEngine__NotMakerOrTaker();
         if (bet.status != BetTypes.Status.WAITING_FOR_ARBITER) revert BetManagementEngine__BetNotWaitingForArbiter();
-        if (block.timestamp < bet.timestamp + 1 hours) revert BetManagementEngine__StillInCooldown();
+        if (block.timestamp < bet.timestamp + 1 days) revert BetManagementEngine__StillInCooldown();
         bet.status = BetTypes.Status.CANCELLED;
         Betcaster(i_betcaster).updateBetStatus(_betNumber, bet.status);
 
