@@ -66,6 +66,7 @@ contract Betcaster is Ownable {
         s_protocolFee = protocolFee;
         s_protocolPaused = false;
         s_prtocolFeeDepositAddress = msg.sender;
+        s_emergencyCancelCooldown = 14 days;
     }
 
     // external functions
@@ -114,6 +115,13 @@ contract Betcaster is Ownable {
         if (_bet.betAmount == 0) revert Betcaster__BetAmountCannotBeZero();
         if (_bet.arbiterFee + _bet.protocolFee >= FEE_PRECISION) revert Betcaster__FeesCannotBeGreaterThan10000();
         s_allBets[_betNumber] = _bet;
+    }
+
+    function updateBet(uint256 _betNumber, BetTypes.Bet memory _bet) public onlyBetManagementEngine {
+        s_allBets[_betNumber].taker = _bet.taker;
+        s_allBets[_betNumber].arbiter = _bet.arbiter;
+        s_allBets[_betNumber].endTime = _bet.endTime;
+        s_allBets[_betNumber].betAgreement = _bet.betAgreement;
     }
 
     function updateBetStatus(uint256 _betNumber, BetTypes.Status _status) public onlyBetManagementEngine {

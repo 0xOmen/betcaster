@@ -5,6 +5,7 @@ import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 import {Betcaster} from "./betcaster.sol";
 import {BetTypes} from "./BetTypes.sol";
+import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title BetManagementEngine
@@ -31,8 +32,10 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
     error BetManagementEngine__TakerCannotBeArbiterOrMaker();
     error BetManagementEngine__BetTokenAddressCannotBeZeroAddress();
     error BetManagementEngine__MakerCannotBeZeroAddress();
+    error BetManagementEngine__StringTooLong();
 
     address immutable i_betcaster;
+    uint256 immutable i_maxStringLength;
 
     // Events
     event BetCreated(uint256 indexed betNumber, BetTypes.Bet indexed bet);
@@ -47,6 +50,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
      */
     constructor(address _betcaster) Ownable(msg.sender) {
         i_betcaster = _betcaster;
+        i_maxStringLength = 1000;
     }
 
     /**
@@ -68,7 +72,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
         uint256 _protocolFee,
         uint256 _arbiterFee,
         string memory _betAgreement
-    ) public {
+    ) public nonReentrant {
         if (msg.sender == address(0)) revert BetManagementEngine__MakerCannotBeZeroAddress();
         if (_betAmount <= 0) revert BetManagementEngine__BetAmountMustBeGreaterThanZero();
         if (_endTime <= block.timestamp) revert BetManagementEngine__EndTimeMustBeInTheFuture();
@@ -80,6 +84,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
         if (_protocolFee < Betcaster(i_betcaster).s_protocolFee()) {
             _protocolFee = Betcaster(i_betcaster).s_protocolFee();
         }
+        enforceStringLength(_betAgreement);
 
         // Get new bet number from Betcaster
         uint256 betNumber = Betcaster(i_betcaster).increaseBetNumber();
@@ -128,14 +133,16 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
         if (bet.maker != msg.sender) revert BetManagementEngine__NotMaker();
         if (bet.status != BetTypes.Status.WAITING_FOR_TAKER) revert BetManagementEngine__BetNotWaitingForTaker();
         if (_endTime <= block.timestamp) revert BetManagementEngine__EndTimeMustBeInTheFuture();
-        if (_taker == msg.sender || _arbiter == msg.sender || _arbiter == _taker) {
+        if (_taker == msg.sender || _arbiter == msg.sender) {
             revert BetManagementEngine__TakerCannotBeArbiterOrMaker();
         }
+        enforceStringLength(_betAgreement);
+
         bet.taker = _taker;
         bet.arbiter = _arbiter;
         bet.endTime = _endTime;
         bet.betAgreement = _betAgreement;
-        Betcaster(i_betcaster).createBet(_betNumber, bet);
+        Betcaster(i_betcaster).updateBet(_betNumber, bet);
     }
 
     /**
@@ -159,7 +166,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
      * Zero transfer amount does not need to be checked because it is already checked at bet creation and cannot be changed.
      * @param _betNumber The number of the bet to accept
      */
-    function acceptBet(uint256 _betNumber) public {
+    function acceptBet(uint256 _betNumber) public nonReentrant {
         BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
         if (bet.status != BetTypes.Status.WAITING_FOR_TAKER) revert BetManagementEngine__BetNotWaitingForTaker();
         if (bet.taker == address(0)) {
@@ -271,6 +278,12 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
         Betcaster(i_betcaster).updateBetStatus(_betNumber, BetTypes.Status.CANCELLED);
         Betcaster(i_betcaster).transferTokensToUser(bet.maker, bet.betTokenAddress, bet.betAmount);
         Betcaster(i_betcaster).transferTokensToUser(bet.taker, bet.betTokenAddress, bet.betAmount);
+    }
+
+    function enforceStringLength(string memory _string) public view {
+        if (bytes(_string).length > i_maxStringLength) {
+            revert BetManagementEngine__StringTooLong();
+        }
     }
 
     /**
