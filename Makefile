@@ -29,7 +29,7 @@ format :; forge fmt
 
 anvil :; anvil -m 'test test test test test test test test test test test junk' --steps-tracing --block-time 1
 
-# Base Mainnet Deployment with Trezor
+# Base Mainnet Deployment
 deploy-base: build
 	forge script script/DeployBetcaster.s.sol:DeployBetcaster \
 		--rpc-url $(BASE_RPC_URL) \
@@ -39,10 +39,30 @@ deploy-base: build
 		--account deployer\
 		-vvvv
 
-# Base Sepolia Testnet Deployment with Trezor
+# Base Sepolia Testnet Deployment
 deploy-base-sepolia: build
 	forge script script/DeployBetcaster.s.sol:DeployBetcaster \
 		--rpc-url $(BASE_SEPOLIA_RPC) \
+		--broadcast \
+		--verify \
+		--etherscan-api-key $(BASESCAN_API_KEY) \
+		--account deployer \
+		-vvvv
+
+# Base Sepolia Testnet BetManagementEngine2 Deployment
+deploy-base-sepolia-betmanagementengine2: build
+	forge script script/UpdateManagementEng.s.sol:UpdateBetcaster \
+		--rpc-url $(BASE_SEPOLIA_RPC) \
+		--broadcast \
+		--verify \
+		--etherscan-api-key $(BASESCAN_API_KEY) \
+		--account deployer \
+		-vvvv
+
+# Base BetManagementEngine2 Deployment
+deploy-base-betmanagementengine2: build
+	forge script script/UpdateManagementEng.s.sol:UpdateBetcaster \
+		--rpc-url $(BASE_RPC_URL) \
 		--broadcast \
 		--verify \
 		--etherscan-api-key $(BASESCAN_API_KEY) \

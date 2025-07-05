@@ -8,7 +8,7 @@ contract HelperConfig is Script {
     NetworkConfig public activeNetworkConfig;
 
     struct NetworkConfig {
-        address weth;
+        address betcaster;
         uint256 deployerKey;
     }
 
@@ -27,27 +27,29 @@ contract HelperConfig is Script {
     }
 
     function getOrCreateAnvilEthConfig() public returns (NetworkConfig memory) {
-        if (activeNetworkConfig.weth != address(0)) {
+        if (activeNetworkConfig.betcaster != address(0)) {
             return activeNetworkConfig;
         }
 
         vm.startBroadcast();
-        ERC20Mock weth = new ERC20Mock();
+        ERC20Mock betcaster = new ERC20Mock();
         vm.stopBroadcast();
-        return NetworkConfig({weth: address(weth), deployerKey: DEFAULT_ANVIL_KEY});
+        return NetworkConfig({betcaster: address(betcaster), deployerKey: DEFAULT_ANVIL_KEY});
     }
 
     function getAnvilConfig() public view returns (NetworkConfig memory) {
-        return NetworkConfig({weth: address(0), deployerKey: DEFAULT_ANVIL_KEY});
+        return NetworkConfig({betcaster: address(0), deployerKey: DEFAULT_ANVIL_KEY});
     }
 
     function getBaseConfig() public pure returns (NetworkConfig memory) {
         // Base mainnet WETH address
-        return NetworkConfig({weth: address(0x4200000000000000000000000000000000000006), deployerKey: 0});
+        address betcaster = 0xEA358a9670a4f2113AA17e8d6C9A0dE68c2a0aEa;
+        return NetworkConfig({betcaster: betcaster, deployerKey: 0});
     }
 
     function getBaseSepoliaConfig() public pure returns (NetworkConfig memory) {
         // Base Sepolia WETH address
-        return NetworkConfig({weth: address(0x4200000000000000000000000000000000000006), deployerKey: 0});
+        address betcaster = 0x117E1b87bb6bb98Be6e2a72F5E860e7F94D3e7f8;
+        return NetworkConfig({betcaster: betcaster, deployerKey: 0});
     }
 }
