@@ -69,6 +69,16 @@ deploy-base-betmanagementengine2: build
 		--account deployer \
 		-vvvv
 
+# Base BetManagementEngine2 Deployment
+deploy-base-arbitermanagementengine2: build
+	forge script script/UpdateArbiterEng.s.sol:UpdateArbiterEng \
+		--rpc-url $(BASE_RPC_URL) \
+		--broadcast \
+		--verify \
+		--etherscan-api-key $(BASESCAN_API_KEY) \
+		--account deployer \
+		-vvvv		
+
 NETWORK_ARGS := --rpc-url http://localhost:8545 --private-key $(DEFAULT_ANVIL_KEY) --broadcast
 
 ifeq ($(findstring --network base-sepolia,$(ARGS)),--network base-sepolia)
