@@ -37,6 +37,9 @@ library BetTypes {
         address arbiter;
         address betTokenAddress;
         uint256 betAmount;
+        address takerBetTokenAddress;
+        uint256 takerBetAmount;
+        bool canSettleEarly;
         uint256 timestamp;
         uint256 endTime;
         Status status;

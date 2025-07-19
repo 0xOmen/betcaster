@@ -4,10 +4,10 @@ pragma solidity ^0.8.20;
 import {Script} from "forge-std/Script.sol";
 import {HelperConfig} from "./HelperConfig.s.sol";
 import {Betcaster} from "../src/betcaster.sol";
-import {BetManagementEngine2} from "../src/betManagementEngine2.sol";
+import {BetManagementEngine} from "../src/betManagementEngine.sol";
 
 contract UpdateBetcaster is Script {
-    function run() public returns (BetManagementEngine2) {
+    function run() public returns (BetManagementEngine) {
         HelperConfig helperConfig = new HelperConfig();
         (address betcaster, uint256 deployerKey) = helperConfig.activeNetworkConfig();
 
@@ -16,7 +16,7 @@ contract UpdateBetcaster is Script {
         } else {
             vm.startBroadcast(deployerKey);
         }
-        BetManagementEngine2 betManagementEngine = new BetManagementEngine2(address(betcaster));
+        BetManagementEngine betManagementEngine = new BetManagementEngine(address(betcaster));
         // get betcaster contract at the predefined address
         Betcaster(betcaster).setBetManagementEngine(address(betManagementEngine));
         vm.stopBroadcast();

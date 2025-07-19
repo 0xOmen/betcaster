@@ -38,11 +38,11 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
     uint256 immutable i_maxStringLength;
 
     // Events
-    event BetCreated(uint256 indexed betNumber, BetTypes.Bet indexed bet);
-    event BetCancelled(uint256 indexed betNumber, address indexed calledBy, BetTypes.Bet indexed bet);
-    event BetAccepted(uint256 indexed betNumber, BetTypes.Bet indexed bet);
+    event BetCreated(uint256 indexed betNumber, BetTypes.Bet bet);
+    event BetCancelled(uint256 indexed betNumber, address indexed calledBy, BetTypes.Bet bet);
+    event BetAccepted(uint256 indexed betNumber, BetTypes.Bet bet);
     event BetClaimed(uint256 indexed betNumber, address indexed winner, BetTypes.Status indexed status);
-    event BetForfeited(uint256 indexed betNumber, address indexed calledBy, BetTypes.Bet indexed bet);
+    event BetForfeited(uint256 indexed betNumber, address indexed calledBy, BetTypes.Bet bet);
 
     /**
      * @notice Constructor for BetManagementEngine
@@ -68,6 +68,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
         address _arbiter,
         address _betTokenAddress,
         uint256 _betAmount,
+        bool _canSettleEarly,
         uint256 _endTime,
         uint256 _protocolFee,
         uint256 _arbiterFee,
@@ -96,6 +97,9 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
             arbiter: _arbiter,
             betTokenAddress: _betTokenAddress,
             betAmount: _betAmount,
+            takerBetTokenAddress: _betTokenAddress,
+            takerBetAmount: _betAmount,
+            canSettleEarly: _canSettleEarly,
             timestamp: block.timestamp,
             protocolFee: _protocolFee,
             endTime: _endTime,
@@ -126,6 +130,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
         uint256 _betNumber,
         address _taker,
         address _arbiter,
+        bool _canSettleEarly,
         uint256 _endTime,
         string memory _betAgreement
     ) public {
@@ -140,6 +145,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
 
         bet.taker = _taker;
         bet.arbiter = _arbiter;
+        bet.canSettleEarly = _canSettleEarly;
         bet.endTime = _endTime;
         bet.betAgreement = _betAgreement;
         Betcaster(i_betcaster).updateBet(_betNumber, bet);
@@ -261,7 +267,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Allows Maker or Taker to emergency cancel bet if arbiter does not arbitrate.
+     * @notice Allows Maker or Taker to emergency cancel bet if arbiter does not arbitrate in a timely manner.
      * Returns tokens to maker and taker with no fee.
      * @notice Must wait the defined cooldown time after bet end time to cancel.
      * @param _betNumber The number of the bet to cancel

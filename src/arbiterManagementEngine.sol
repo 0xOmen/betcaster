@@ -6,6 +6,14 @@ import {BetTypes} from "./BetTypes.sol";
 import {Betcaster} from "./betcaster.sol";
 import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 
+/**
+ * @title Arbiter Management Engine version 0.0.2
+ * @author Betcaster
+ * @notice This contract is used to manage the arbiter role for a bet.
+ * It allows the arbiter to select a winner for a bet and to transfer the tokens to the arbiter.
+ * It also allows the owner to set an allowlist and to enforce it.
+ * It also allows the owner to set the enforcement of the allowlist.
+ */
 contract ArbiterManagementEngine is Ownable, ReentrancyGuard {
     error ArbiterManagementEngine__NotArbiter();
     error ArbiterManagementEngine__BetNotWaitingForArbiter();
@@ -70,11 +78,11 @@ contract ArbiterManagementEngine is Ownable, ReentrancyGuard {
         if (bet.status != BetTypes.Status.IN_PROCESS) {
             revert ArbiterManagementEngine__BetNotInProcess();
         }
-        if (block.timestamp < bet.endTime) {
-            revert ArbiterManagementEngine__EndTimeNotReached();
-        }
         if (bet.arbiter != msg.sender) {
             revert ArbiterManagementEngine__NotArbiter();
+        }
+        if (!bet.canSettleEarly && block.timestamp < bet.endTime) {
+            revert ArbiterManagementEngine__EndTimeNotReached();
         }
         if (bet.maker == _winner) {
             Betcaster(i_betcaster).arbiterUpdateBetStatus(_betNumber, BetTypes.Status.MAKER_WINS);

@@ -29,6 +29,7 @@ contract BetcasterTest is Test {
     uint256 public constant BET_AMOUNT = 1000e18;
     uint256 public constant ARBITER_FEE = 100; // 1%
     uint256 public constant INITIAL_TOKEN_SUPPLY = 1000000e18;
+    bool public constant CAN_SETTLE_EARLY = false;
     string public constant BET_AGREEMENT = "Team A will win the match";
 
     // Events for testing
@@ -71,6 +72,7 @@ contract BetcasterTest is Test {
             arbiter,
             address(mockToken),
             BET_AMOUNT,
+            CAN_SETTLE_EARLY,
             block.timestamp + 1 days,
             PROTOCOL_FEE,
             ARBITER_FEE,
@@ -150,6 +152,9 @@ contract BetcasterTest is Test {
                 arbiter: arbiter,
                 betTokenAddress: address(mockToken),
                 betAmount: BET_AMOUNT,
+                takerBetTokenAddress: address(mockToken),
+                takerBetAmount: BET_AMOUNT,
+                canSettleEarly: false,
                 timestamp: block.timestamp,
                 endTime: block.timestamp + 1 days,
                 status: BetTypes.Status.WAITING_FOR_TAKER,
@@ -206,6 +211,7 @@ contract BetcasterTest is Test {
             arbiter,
             address(mockToken),
             BET_AMOUNT,
+            CAN_SETTLE_EARLY,
             block.timestamp + 1 days,
             PROTOCOL_FEE,
             ARBITER_FEE,
@@ -222,6 +228,7 @@ contract BetcasterTest is Test {
             arbiter,
             address(mockToken),
             BET_AMOUNT,
+            CAN_SETTLE_EARLY,
             block.timestamp + 1 days,
             PROTOCOL_FEE,
             ARBITER_FEE,
@@ -237,6 +244,7 @@ contract BetcasterTest is Test {
             arbiter,
             address(mockToken),
             BET_AMOUNT,
+            CAN_SETTLE_EARLY,
             block.timestamp + 1 days,
             PROTOCOL_FEE,
             ARBITER_FEE,
@@ -323,6 +331,9 @@ contract BetcasterTest is Test {
             arbiter: arbiter,
             betTokenAddress: address(mockToken),
             betAmount: BET_AMOUNT,
+            takerBetTokenAddress: address(mockToken),
+            takerBetAmount: BET_AMOUNT,
+            canSettleEarly: false,
             timestamp: block.timestamp,
             endTime: endTime,
             status: BetTypes.Status.WAITING_FOR_TAKER,
@@ -343,6 +354,7 @@ contract BetcasterTest is Test {
         assertEq(createdBet.arbiter, arbiter);
         assertEq(createdBet.betTokenAddress, address(mockToken));
         assertEq(createdBet.betAmount, BET_AMOUNT);
+        assertEq(createdBet.canSettleEarly, false);
         assertEq(createdBet.timestamp, block.timestamp);
         assertEq(createdBet.endTime, endTime);
         assertEq(uint256(createdBet.status), uint256(BetTypes.Status.WAITING_FOR_TAKER));
@@ -364,7 +376,15 @@ contract BetcasterTest is Test {
 
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, endTime, PROTOCOL_FEE, ARBITER_FEE, BET_AGREEMENT
+            taker,
+            arbiter,
+            address(mockToken),
+            BET_AMOUNT,
+            CAN_SETTLE_EARLY,
+            endTime,
+            PROTOCOL_FEE,
+            ARBITER_FEE,
+            BET_AGREEMENT
         );
 
         assertEq(betcaster.getCurrentBetNumber(), 1);
@@ -377,6 +397,9 @@ contract BetcasterTest is Test {
             arbiter: arbiter,
             betTokenAddress: address(mockToken),
             betAmount: BET_AMOUNT,
+            takerBetTokenAddress: address(mockToken),
+            takerBetAmount: BET_AMOUNT,
+            canSettleEarly: false,
             timestamp: block.timestamp,
             endTime: block.timestamp + 1 days,
             status: BetTypes.Status.WAITING_FOR_TAKER,
@@ -396,6 +419,7 @@ contract BetcasterTest is Test {
         assertEq(retrievedBet.arbiter, arbiter);
         assertEq(retrievedBet.betTokenAddress, address(mockToken));
         assertEq(retrievedBet.betAmount, BET_AMOUNT);
+        assertEq(retrievedBet.canSettleEarly, false);
         assertEq(retrievedBet.endTime, endTime);
         assertEq(uint256(retrievedBet.status), uint256(BetTypes.Status.WAITING_FOR_TAKER));
         assertEq(retrievedBet.protocolFee, PROTOCOL_FEE);
@@ -411,6 +435,7 @@ contract BetcasterTest is Test {
         assertEq(emptyBet.arbiter, address(0));
         assertEq(emptyBet.betTokenAddress, address(0));
         assertEq(emptyBet.betAmount, 0);
+        assertEq(emptyBet.canSettleEarly, false);
         assertEq(emptyBet.timestamp, 0);
         assertEq(emptyBet.endTime, 0);
         assertEq(uint256(emptyBet.status), 0);

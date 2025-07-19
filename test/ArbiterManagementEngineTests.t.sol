@@ -29,12 +29,13 @@ contract ArbiterManagementEngineTest is Test {
     uint256 public constant BET_AMOUNT = 1000e18;
     uint256 public constant ARBITER_FEE = 50; // 0.5%
     uint256 public constant INITIAL_TOKEN_SUPPLY = 1000000000e18;
+    bool public constant CAN_SETTLE_EARLY = false;
     string public constant BET_AGREEMENT = "Team A will win the match";
 
     // Events for testing
-    event BetCreated(uint256 indexed betNumber, BetTypes.Bet indexed bet);
-    event BetCancelled(uint256 indexed betNumber, address indexed calledBy, BetTypes.Bet indexed bet);
-    event BetAccepted(uint256 indexed betNumber, BetTypes.Bet indexed bet);
+    event BetCreated(uint256 indexed betNumber, BetTypes.Bet bet);
+    event BetCancelled(uint256 indexed betNumber, address indexed calledBy, BetTypes.Bet bet);
+    event BetAccepted(uint256 indexed betNumber, BetTypes.Bet bet);
     event Transfer(address indexed from, address indexed to, uint256 value);
     event ArbiterAcceptedRole(uint256 indexed betNumber, address indexed arbiter);
     event WinnerSelected(uint256 indexed betNumber, address indexed winner);
@@ -77,6 +78,7 @@ contract ArbiterManagementEngineTest is Test {
             arbiter,
             address(mockToken),
             BET_AMOUNT,
+            CAN_SETTLE_EARLY,
             block.timestamp + 1 days,
             PROTOCOL_FEE,
             ARBITER_FEE,
@@ -138,6 +140,7 @@ contract ArbiterManagementEngineTest is Test {
             address(0),
             address(mockToken),
             BET_AMOUNT,
+            CAN_SETTLE_EARLY,
             block.timestamp + 1 days,
             PROTOCOL_FEE,
             ARBITER_FEE,
@@ -306,6 +309,7 @@ contract ArbiterManagementEngineTest is Test {
             arbiter,
             address(mockToken),
             betAmount,
+            CAN_SETTLE_EARLY,
             block.timestamp + 1 days,
             PROTOCOL_FEE,
             arbiterFeePercent,
@@ -339,7 +343,15 @@ contract ArbiterManagementEngineTest is Test {
         // Create bet with zero arbiter fee
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, block.timestamp + 1 days, PROTOCOL_FEE, 0, BET_AGREEMENT
+            taker,
+            arbiter,
+            address(mockToken),
+            BET_AMOUNT,
+            CAN_SETTLE_EARLY,
+            block.timestamp + 1 days,
+            PROTOCOL_FEE,
+            0,
+            BET_AGREEMENT
         );
 
         vm.prank(taker);
@@ -367,7 +379,15 @@ contract ArbiterManagementEngineTest is Test {
         // Create bet with maximum arbiter fee
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, block.timestamp + 1 days, protocolFee, maxFee, BET_AGREEMENT
+            taker,
+            arbiter,
+            address(mockToken),
+            BET_AMOUNT,
+            CAN_SETTLE_EARLY,
+            block.timestamp + 1 days,
+            protocolFee,
+            maxFee,
+            BET_AGREEMENT
         );
 
         vm.prank(taker);
@@ -459,6 +479,7 @@ contract ArbiterManagementEngineTest is Test {
             address(0), // zero address arbiter
             address(mockToken),
             BET_AMOUNT,
+            CAN_SETTLE_EARLY,
             block.timestamp + 1 days,
             PROTOCOL_FEE,
             ARBITER_FEE,
@@ -493,6 +514,7 @@ contract ArbiterManagementEngineTest is Test {
             address(0), // zero address arbiter
             address(mockToken),
             BET_AMOUNT,
+            CAN_SETTLE_EARLY,
             block.timestamp + 1 days,
             PROTOCOL_FEE,
             ARBITER_FEE,
@@ -519,6 +541,7 @@ contract ArbiterManagementEngineTest is Test {
             address(0), // zero address arbiter
             address(mockToken),
             BET_AMOUNT,
+            CAN_SETTLE_EARLY,
             block.timestamp + 1 days,
             PROTOCOL_FEE,
             ARBITER_FEE,
@@ -551,6 +574,7 @@ contract ArbiterManagementEngineTest is Test {
             user2, // specific arbiter
             address(mockToken),
             BET_AMOUNT,
+            CAN_SETTLE_EARLY,
             block.timestamp + 1 days,
             PROTOCOL_FEE,
             ARBITER_FEE,
@@ -583,6 +607,7 @@ contract ArbiterManagementEngineTest is Test {
             user1, // specific arbiter
             address(mockToken),
             BET_AMOUNT,
+            CAN_SETTLE_EARLY,
             block.timestamp + 1 days,
             PROTOCOL_FEE,
             ARBITER_FEE,
@@ -659,6 +684,7 @@ contract ArbiterManagementEngineTest is Test {
             address(0), // zero address arbiter
             address(mockToken),
             BET_AMOUNT,
+            CAN_SETTLE_EARLY,
             block.timestamp + 1 days,
             PROTOCOL_FEE,
             ARBITER_FEE,
