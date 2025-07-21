@@ -131,6 +131,10 @@ contract Betcaster is Ownable {
         s_allBets[_betNumber].status = _status;
     }
 
+    function updateBetTimestamp(uint256 _betNumber) public onlyBetManagementEngine {
+        s_allBets[_betNumber].timestamp = block.timestamp;
+    }
+
     function arbiterUpdateBetStatus(uint256 _betNumber, BetTypes.Status _status) public onlyArbiterManagementEngine {
         s_allBets[_betNumber].status = _status;
     }

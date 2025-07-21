@@ -186,6 +186,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
         if (block.timestamp > bet.endTime) revert BetManagementEngine__EndTimeMustBeInTheFuture();
         bet.status = BetTypes.Status.WAITING_FOR_ARBITER;
         Betcaster(i_betcaster).updateBetStatus(_betNumber, bet.status);
+        Betcaster(i_betcaster).updateBetTimestamp(_betNumber);
 
         emit BetAccepted(_betNumber, bet);
 
