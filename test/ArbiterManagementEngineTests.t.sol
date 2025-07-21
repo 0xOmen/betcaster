@@ -38,7 +38,7 @@ contract ArbiterManagementEngineTest is Test {
     event BetAccepted(uint256 indexed betNumber, BetTypes.Bet bet);
     event Transfer(address indexed from, address indexed to, uint256 value);
     event ArbiterAcceptedRole(uint256 indexed betNumber, address indexed arbiter);
-    event WinnerSelected(uint256 indexed betNumber, address indexed winner);
+    event WinnerSelected(uint256 indexed betNumber, bool indexed resolvedTrue, BetTypes.Bet bet);
     event AllowListUpdated(address indexed address_, bool indexed allowed);
     event AllowListEnforcementUpdated(bool indexed isAllowListEnforced);
 
@@ -174,10 +174,10 @@ contract ArbiterManagementEngineTest is Test {
         uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter);
 
         vm.expectEmit(true, true, false, false);
-        emit WinnerSelected(1, maker);
+        emit WinnerSelected(1, true, betcaster.getBet(1));
 
         vm.prank(arbiter);
-        arbiterManagementEngine.selectWinner(1, maker);
+        arbiterManagementEngine.selectWinner(1, true);
 
         assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.MAKER_WINS));
         assertEq(mockToken.balanceOf(arbiter), arbiterBalanceBefore + expectedArbiterFee);
@@ -193,10 +193,10 @@ contract ArbiterManagementEngineTest is Test {
         uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter);
 
         vm.expectEmit(true, true, false, false);
-        emit WinnerSelected(1, taker);
+        emit WinnerSelected(1, false, betcaster.getBet(1));
 
         vm.prank(arbiter);
-        arbiterManagementEngine.selectWinner(1, taker);
+        arbiterManagementEngine.selectWinner(1, false);
 
         assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.TAKER_WINS));
         assertEq(mockToken.balanceOf(arbiter), arbiterBalanceBefore + expectedArbiterFee);
@@ -207,7 +207,7 @@ contract ArbiterManagementEngineTest is Test {
 
         vm.expectRevert(ArbiterManagementEngine.ArbiterManagementEngine__BetNotInProcess.selector);
         vm.prank(arbiter);
-        arbiterManagementEngine.selectWinner(1, maker);
+        arbiterManagementEngine.selectWinner(1, true);
     }
 
     function testSelectWinner_RevertWhen_EndTimeNotReached() public {
@@ -216,7 +216,7 @@ contract ArbiterManagementEngineTest is Test {
         // Don't warp time - still before end time
         vm.expectRevert(ArbiterManagementEngine.ArbiterManagementEngine__EndTimeNotReached.selector);
         vm.prank(arbiter);
-        arbiterManagementEngine.selectWinner(1, maker);
+        arbiterManagementEngine.selectWinner(1, true);
     }
 
     function testSelectWinner_RevertWhen_NotArbiter() public {
@@ -227,18 +227,7 @@ contract ArbiterManagementEngineTest is Test {
 
         vm.expectRevert(ArbiterManagementEngine.ArbiterManagementEngine__NotArbiter.selector);
         vm.prank(user1); // Wrong arbiter
-        arbiterManagementEngine.selectWinner(1, maker);
-    }
-
-    function testSelectWinner_RevertWhen_WinnerNotValid() public {
-        _setupBetInProcess();
-
-        // Warp to after end time
-        vm.warp(block.timestamp + 2 days);
-
-        vm.expectRevert(ArbiterManagementEngine.ArbiterManagementEngine__WinnerNotValid.selector);
-        vm.prank(arbiter);
-        arbiterManagementEngine.selectWinner(1, user1); // Invalid winner
+        arbiterManagementEngine.selectWinner(1, true);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -264,7 +253,7 @@ contract ArbiterManagementEngineTest is Test {
         uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter);
 
         vm.prank(arbiter);
-        arbiterManagementEngine.selectWinner(1, maker);
+        arbiterManagementEngine.selectWinner(1, true);
 
         assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.MAKER_WINS));
         assertEq(mockToken.balanceOf(arbiter), arbiterBalanceBefore + expectedArbiterFee);
@@ -287,7 +276,7 @@ contract ArbiterManagementEngineTest is Test {
         uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter);
 
         vm.prank(arbiter);
-        arbiterManagementEngine.selectWinner(1, taker);
+        arbiterManagementEngine.selectWinner(1, false);
 
         assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.TAKER_WINS));
         assertEq(mockToken.balanceOf(arbiter), arbiterBalanceBefore + expectedArbiterFee);
@@ -330,7 +319,7 @@ contract ArbiterManagementEngineTest is Test {
         uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter);
 
         vm.prank(arbiter);
-        arbiterManagementEngine.selectWinner(2, maker);
+        arbiterManagementEngine.selectWinner(2, true);
 
         assertEq(mockToken.balanceOf(arbiter), arbiterBalanceBefore + expectedFee);
     }
@@ -365,7 +354,7 @@ contract ArbiterManagementEngineTest is Test {
         uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter);
 
         vm.prank(arbiter);
-        arbiterManagementEngine.selectWinner(2, maker);
+        arbiterManagementEngine.selectWinner(2, true);
 
         // Arbiter should receive 0 fee
         assertEq(mockToken.balanceOf(arbiter), arbiterBalanceBefore);
@@ -404,7 +393,7 @@ contract ArbiterManagementEngineTest is Test {
         uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter);
 
         vm.prank(arbiter);
-        arbiterManagementEngine.selectWinner(2, maker);
+        arbiterManagementEngine.selectWinner(2, true);
 
         assertEq(mockToken.balanceOf(arbiter), arbiterBalanceBefore + expectedFee);
         assertEq(mockToken.balanceOf(address(betcaster)), betcasterStartingBalance - expectedFee); // Verify balance of Betcaster contract

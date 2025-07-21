@@ -763,7 +763,7 @@ contract BetManagementEngineTest is Test {
 
         // Arbiter selects maker as winner
         vm.prank(arbiter);
-        arbiterManagementEngine.selectWinner(1, maker);
+        arbiterManagementEngine.selectWinner(1, true);
 
         return 1;
     }
@@ -799,7 +799,7 @@ contract BetManagementEngineTest is Test {
 
         // Arbiter selects taker as winner
         vm.prank(arbiter);
-        arbiterManagementEngine.selectWinner(1, taker);
+        arbiterManagementEngine.selectWinner(1, false);
 
         return 1;
     }
@@ -991,7 +991,7 @@ contract BetManagementEngineTest is Test {
         uint256 ownerBalanceBefore = mockToken.balanceOf(betManagementEngine.owner());
 
         vm.prank(arbiter);
-        arbiterManagementEngine.selectWinner(1, maker);
+        arbiterManagementEngine.selectWinner(1, true);
 
         // Claim bet
         vm.prank(maker);
@@ -1021,7 +1021,7 @@ contract BetManagementEngineTest is Test {
         vm.warp(block.timestamp + 2 days);
 
         vm.prank(arbiter);
-        arbiterManagementEngine.selectWinner(1, maker);
+        arbiterManagementEngine.selectWinner(1, true);
 
         uint256 totalBetAmount = BET_AMOUNT * 2;
         uint256 expectedProtocolRake = totalBetAmount * PROTOCOL_FEE / 10000;
@@ -1090,7 +1090,7 @@ contract BetManagementEngineTest is Test {
         vm.warp(block.timestamp + 2 days);
 
         vm.prank(arbiter);
-        arbiterManagementEngine.selectWinner(1, maker);
+        arbiterManagementEngine.selectWinner(1, true);
 
         // Calculate expected amounts
         uint256 totalBetAmount = betAmount * 2;
@@ -1150,7 +1150,7 @@ contract BetManagementEngineTest is Test {
 
         // 5. Arbiter selects winner
         vm.prank(arbiter);
-        arbiterManagementEngine.selectWinner(1, maker);
+        arbiterManagementEngine.selectWinner(1, true);
 
         // 6. Claim bet
         vm.prank(user1);
@@ -1539,7 +1539,7 @@ contract BetManagementEngineTest is Test {
         // Second bet: normal arbiter decision
         vm.warp(block.timestamp + 2 days);
         vm.prank(arbiter);
-        arbiterManagementEngine.selectWinner(2, user2);
+        arbiterManagementEngine.selectWinner(2, false);
 
         // Compare arbiter fees
         assertEq(betcaster.getBet(1).arbiterFee, 0); // Forfeited bet has no arbiter fee
@@ -1958,7 +1958,7 @@ contract BetManagementEngineTest is Test {
         // Complete the bet normally first
         vm.warp(block.timestamp + 1 days + 1 minutes);
         vm.prank(arbiter);
-        arbiterManagementEngine.selectWinner(1, maker);
+        arbiterManagementEngine.selectWinner(1, true);
 
         // Warp past cooldown period
         vm.warp(block.timestamp + 1 hours + 1 minutes);
@@ -2325,7 +2325,7 @@ contract BetManagementEngineTest is Test {
 
         // 5. Arbiter selects winner
         vm.prank(arbiter);
-        arbiterManagementEngine.selectWinner(1, maker);
+        arbiterManagementEngine.selectWinner(1, true);
 
         // 6. Claim bet
         vm.prank(user1);
@@ -2390,7 +2390,7 @@ contract BetManagementEngineTest is Test {
 
         // 5. Arbiter selects winner
         vm.prank(arbiter);
-        arbiterManagementEngine.selectWinner(1, maker);
+        arbiterManagementEngine.selectWinner(1, true);
 
         // 6. Claim bet
         vm.prank(user1);

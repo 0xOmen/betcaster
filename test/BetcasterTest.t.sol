@@ -185,6 +185,10 @@ contract BetcasterTest is Test {
         vm.expectRevert(Betcaster.Betcaster__NotBetManagementEngine.selector);
         vm.prank(user1);
         betcaster.depositToBetcaster(maker, address(mockToken), BET_AMOUNT);
+
+        vm.expectRevert(Betcaster.Betcaster__NotBetManagementEngine.selector);
+        vm.prank(user1);
+        betcaster.updateBetTimestamp(1);
     }
 
     function testOnlyArbiterManagementEngineAccessControl() public {
@@ -298,7 +302,7 @@ contract BetcasterTest is Test {
 
         vm.expectRevert(Betcaster.Betcaster__ProtocolPaused.selector);
         vm.prank(arbiter);
-        arbiterManagementEngine.selectWinner(2, maker);
+        arbiterManagementEngine.selectWinner(2, true);
 
         vm.expectRevert(Betcaster.Betcaster__ProtocolPaused.selector);
         vm.prank(maker);
@@ -308,7 +312,7 @@ contract BetcasterTest is Test {
         betcaster.unpauseProtocol();
 
         vm.prank(arbiter);
-        arbiterManagementEngine.selectWinner(2, maker);
+        arbiterManagementEngine.selectWinner(2, true);
 
         vm.prank(owner);
         betcaster.pauseProtocol();
