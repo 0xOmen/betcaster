@@ -28,7 +28,7 @@ contract ArbiterManagementEngine is Ownable, ReentrancyGuard {
     bool private s_enforceAllowList;
 
     event ArbiterAcceptedRole(uint256 indexed betNumber, address indexed arbiter);
-    event WinnerSelected(uint256 indexed betNumber, address indexed winner);
+    event WinnerSelected(uint256 indexed betNumber, bool indexed winner, BetTypes.Bet bet);
     event AllowListUpdated(address indexed address_, bool indexed allowed);
     event AllowListEnforcementUpdated(bool indexed enforced);
 
@@ -69,11 +69,13 @@ contract ArbiterManagementEngine is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Allows Arbiter to Select a winner for a bet.
+     * @notice Arbiter should pass true/1 if the bet parameters resolve to true or false/0 if not.
+     * This will update the bet status to MAKER_WINS or TAKER_WINS.
+     * The arbiter will receive the arbiter fee.
      * @param _betNumber The number of the bet to select a winner for.
-     * @param _winner The address of the winner.
+     * @param _betParamsTrue should be true/1 if the bet parameters resolv to true.
      */
-    function selectWinner(uint256 _betNumber, address _winner) public nonReentrant {
+    function selectWinner(uint256 _betNumber, bool _betParamsTrue) public nonReentrant {
         BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
         if (bet.status != BetTypes.Status.IN_PROCESS) {
             revert ArbiterManagementEngine__BetNotInProcess();
@@ -84,12 +86,14 @@ contract ArbiterManagementEngine is Ownable, ReentrancyGuard {
         if (!bet.canSettleEarly && block.timestamp < bet.endTime) {
             revert ArbiterManagementEngine__EndTimeNotReached();
         }
-        if (bet.maker == _winner) {
+        if (_betParamsTrue) {
             Betcaster(i_betcaster).arbiterUpdateBetStatus(_betNumber, BetTypes.Status.MAKER_WINS);
-            emit WinnerSelected(_betNumber, _winner);
-        } else if (bet.taker == _winner) {
+            bet.status = BetTypes.Status.MAKER_WINS;
+            emit WinnerSelected(_betNumber, _betParamsTrue, bet);
+        } else if (!_betParamsTrue) {
             Betcaster(i_betcaster).arbiterUpdateBetStatus(_betNumber, BetTypes.Status.TAKER_WINS);
-            emit WinnerSelected(_betNumber, _winner);
+            bet.status = BetTypes.Status.TAKER_WINS;
+            emit WinnerSelected(_betNumber, _betParamsTrue, bet);
         } else {
             revert ArbiterManagementEngine__WinnerNotValid();
         }

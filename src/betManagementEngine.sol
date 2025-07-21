@@ -196,7 +196,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
     /**
      * @notice Allows Maker or Taker to cancel bet if no arbiter accepts role.
      * Returns tokens to maker and taker with no fee.
-     * @notice Must wait 1 day after bet is created to cancel.
+     * @notice Must wait 1 day after Taker accepts bet to cancel.
      * @param _betNumber The number of the bet to cancel
      */
     function noArbiterCancelBet(uint256 _betNumber) public nonReentrant {
