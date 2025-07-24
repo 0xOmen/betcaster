@@ -41,6 +41,7 @@ library BetTypes {
         uint256 takerBetAmount;
         bool canSettleEarly;
         uint256 timestamp;
+        uint256 takerDeadline;
         uint256 endTime;
         Status status;
         uint256 protocolFee;

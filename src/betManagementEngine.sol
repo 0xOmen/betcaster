@@ -102,6 +102,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
             canSettleEarly: _canSettleEarly,
             timestamp: block.timestamp,
             protocolFee: _protocolFee,
+            takerDeadline: _endTime,
             endTime: _endTime,
             status: BetTypes.Status.WAITING_FOR_TAKER,
             arbiterFee: _arbiterFee,

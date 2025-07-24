@@ -122,6 +122,7 @@ contract Betcaster is Ownable {
         s_allBets[_betNumber].arbiter = _bet.arbiter;
         s_allBets[_betNumber].takerBetTokenAddress = _bet.takerBetTokenAddress;
         s_allBets[_betNumber].takerBetAmount = _bet.takerBetAmount;
+        s_allBets[_betNumber].takerDeadline = _bet.takerDeadline;
         s_allBets[_betNumber].endTime = _bet.endTime;
         s_allBets[_betNumber].canSettleEarly = _bet.canSettleEarly;
         s_allBets[_betNumber].betAgreement = _bet.betAgreement;
