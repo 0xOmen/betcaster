@@ -193,6 +193,27 @@ contract ArbiterManagementEngineTest is Test {
         assertEq(betcaster.getBet(2).arbiter[0], arbiter[0]);
     }
 
+    function testArbiterAcceptRole_WithMultipleNullAddressInArbiterArray() public {
+        address[] memory multiArbiter = new address[](3);
+        multiArbiter[0] = user1[0];
+        multiArbiter[2] = arbiter[0];
+        // Create a bet with zero address arbiter (anyone can be arbiter)
+        //expect revert Zero address in array
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__ZeroAddressInArrary.selector);
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker,
+            multiArbiter,
+            address(mockToken),
+            BET_AMOUNT,
+            CAN_SETTLE_EARLY,
+            block.timestamp + 1 days,
+            PROTOCOL_FEE,
+            ARBITER_FEE,
+            BET_AGREEMENT
+        );
+    }
+
     /*//////////////////////////////////////////////////////////////
                         SELECT WINNER TESTS
     //////////////////////////////////////////////////////////////*/
