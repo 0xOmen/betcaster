@@ -451,29 +451,4 @@ contract BetcasterTest is Test {
         assertEq(emptyBet.arbiterFee, 0);
         assertEq(emptyBet.betAgreement, "");
     }
-
-    function testEmptyArrayInBet() public {
-        address[] memory emptyTaker;
-        BetTypes.Bet memory bet = BetTypes.Bet({
-            maker: maker,
-            taker: emptyTaker,
-            arbiter: arbiter,
-            betTokenAddress: address(mockToken),
-            betAmount: BET_AMOUNT,
-            takerBetTokenAddress: address(mockToken),
-            takerBetAmount: BET_AMOUNT,
-            canSettleEarly: false,
-            timestamp: block.timestamp,
-            takerDeadline: block.timestamp + 1 days,
-            endTime: block.timestamp + 1 days,
-            status: BetTypes.Status.WAITING_FOR_TAKER,
-            protocolFee: PROTOCOL_FEE,
-            arbiterFee: ARBITER_FEE,
-            betAgreement: BET_AGREEMENT
-        });
-
-        vm.expectRevert(Betcaster.Betcaster__ArrayCannotBeEmpty.selector);
-        vm.prank(address(betManagementEngine));
-        betcaster.createBet(1, bet);
-    }
 }

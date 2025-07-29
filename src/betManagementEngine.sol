@@ -34,6 +34,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
     error BetManagementEngine__MakerCannotBeZeroAddress();
     error BetManagementEngine__StringTooLong();
     error BetManagementEngine__ZeroAddressInArrary();
+    error BetManagementEngine__ArrayCannotBeEmpty();
 
     address immutable i_betcaster;
     uint256 immutable i_maxStringLength;
@@ -81,6 +82,8 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
         if (_containsAddress(_taker, msg.sender) || _containsAddress(_arbiter, msg.sender)) {
             revert BetManagementEngine__TakerCannotBeArbiterOrMaker();
         }
+        if (_taker.length == 0) revert BetManagementEngine__ArrayCannotBeEmpty();
+        if (_arbiter.length == 0) revert BetManagementEngine__ArrayCannotBeEmpty();
         if (_taker.length > 1 && _containsAddress(_taker, address(0))) {
             revert BetManagementEngine__ZeroAddressInArrary();
         }
@@ -143,6 +146,8 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
         string memory _betAgreement
     ) public {
         BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
+        if (bet.taker.length == 0) revert BetManagementEngine__ArrayCannotBeEmpty();
+        if (bet.arbiter.length == 0) revert BetManagementEngine__ArrayCannotBeEmpty();
         if (bet.maker != msg.sender) revert BetManagementEngine__NotMaker();
         if (bet.status != BetTypes.Status.WAITING_FOR_TAKER) revert BetManagementEngine__BetNotWaitingForTaker();
         if (_endTime <= block.timestamp) revert BetManagementEngine__EndTimeMustBeInTheFuture();

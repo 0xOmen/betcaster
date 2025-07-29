@@ -193,6 +193,24 @@ contract BetManagementEngineTest is Test {
         );
     }
 
+    function testEmptyArrayInBet() public {
+        address[] memory emptyTaker;
+
+        vm.expectRevert(BetManagementEngine.BetManagementEngine__ArrayCannotBeEmpty.selector);
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            emptyTaker,
+            arbiterArray,
+            address(mockToken),
+            BET_AMOUNT,
+            CAN_SETTLE_EARLY,
+            block.timestamp + 1 days,
+            PROTOCOL_FEE,
+            ARBITER_FEE,
+            BET_AGREEMENT
+        );
+    }
+
     /*//////////////////////////////////////////////////////////////
                         MAKER CANCEL BET TESTS
     //////////////////////////////////////////////////////////////*/
@@ -388,6 +406,57 @@ contract BetManagementEngineTest is Test {
         // Verify tokens were transferred
         assertEq(mockToken.balanceOf(user1), user1BalanceBefore - BET_AMOUNT);
         assertEq(mockToken.balanceOf(address(betcaster)), contractBalanceBefore + BET_AMOUNT);
+    }
+
+    function testAcceptBetWithMultipleAddressesInTakerArray() public {
+        uint256 endTime = block.timestamp + 1 days;
+        address[] memory multiTaker = new address[](2);
+        multiTaker[0] = user1;
+        multiTaker[1] = taker;
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            multiTaker,
+            arbiterArray,
+            address(mockToken),
+            BET_AMOUNT,
+            CAN_SETTLE_EARLY,
+            endTime,
+            PROTOCOL_FEE,
+            ARBITER_FEE,
+            BET_AGREEMENT
+        );
+
+        // Expect multiple events: Transfer (from ERC20) and BetAccepted
+        BetTypes.Bet memory bet = BetTypes.Bet({
+            maker: maker,
+            taker: multiTaker,
+            arbiter: arbiterArray,
+            betTokenAddress: address(mockToken),
+            betAmount: BET_AMOUNT,
+            takerBetTokenAddress: address(mockToken),
+            takerBetAmount: BET_AMOUNT,
+            canSettleEarly: false,
+            timestamp: block.timestamp,
+            takerDeadline: endTime,
+            endTime: endTime,
+            status: BetTypes.Status.WAITING_FOR_ARBITER,
+            protocolFee: PROTOCOL_FEE,
+            arbiterFee: ARBITER_FEE,
+            betAgreement: BET_AGREEMENT
+        });
+        vm.expectEmit(true, true, false, false);
+        emit BetAccepted(1, bet);
+        vm.expectEmit(true, true, false, false);
+        emit Transfer(taker, address(betcaster), BET_AMOUNT);
+
+        // Accept bet
+        vm.prank(taker);
+        betManagementEngine.acceptBet(1);
+
+        // Verify bet status changed
+        BetTypes.Bet memory acceptedBet = betcaster.getBet(1);
+        assertEq(uint256(acceptedBet.status), uint256(BetTypes.Status.WAITING_FOR_ARBITER));
+        assertEq(acceptedBet.taker[0], taker);
     }
 
     function testAcceptBetRevertsWhenNotWaitingForTaker() public {
