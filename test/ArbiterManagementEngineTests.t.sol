@@ -162,6 +162,37 @@ contract ArbiterManagementEngineTest is Test {
         assertEq(betcaster.getBet(2).arbiter[0], user1[0]);
     }
 
+    function testArbiterAcceptRole_WithMultipleAddressesInArbiterArray() public {
+        address[] memory multiArbiter = new address[](2);
+        multiArbiter[0] = user1[0];
+        multiArbiter[1] = arbiter[0];
+        // Create a bet with zero address arbiter (anyone can be arbiter)
+        vm.prank(maker);
+        betManagementEngine.createBet(
+            taker,
+            multiArbiter,
+            address(mockToken),
+            BET_AMOUNT,
+            CAN_SETTLE_EARLY,
+            block.timestamp + 1 days,
+            PROTOCOL_FEE,
+            ARBITER_FEE,
+            BET_AGREEMENT
+        );
+
+        vm.prank(taker[0]);
+        betManagementEngine.acceptBet(2);
+
+        vm.expectEmit(true, true, false, false);
+        emit ArbiterAcceptedRole(2, arbiter[0]);
+
+        vm.prank(arbiter[0]);
+        arbiterManagementEngine.ArbiterAcceptRole(2);
+
+        assertEq(uint256(betcaster.getBet(2).status), uint256(BetTypes.Status.IN_PROCESS));
+        assertEq(betcaster.getBet(2).arbiter[0], arbiter[0]);
+    }
+
     /*//////////////////////////////////////////////////////////////
                         SELECT WINNER TESTS
     //////////////////////////////////////////////////////////////*/
