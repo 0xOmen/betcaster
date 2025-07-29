@@ -27,6 +27,7 @@ contract Betcaster is Ownable {
     error Betcaster__FeesCannotBeGreaterThan10000();
     error Betcaster__CannotBeZeroAddress();
     error Betcaster__BetAmountMismatch();
+    error Betcaster__ArrayCannotBeEmpty();
 
     // State variables
     bool private s_protocolPaused;
@@ -112,12 +113,16 @@ contract Betcaster is Ownable {
     }
 
     function createBet(uint256 _betNumber, BetTypes.Bet memory _bet) public onlyBetManagementEngine {
+        if (_bet.taker.length == 0) revert Betcaster__ArrayCannotBeEmpty();
+        if (_bet.arbiter.length == 0) revert Betcaster__ArrayCannotBeEmpty();
         if (_bet.betAmount == 0) revert Betcaster__BetAmountCannotBeZero();
         if (_bet.arbiterFee + _bet.protocolFee >= FEE_PRECISION) revert Betcaster__FeesCannotBeGreaterThan10000();
         s_allBets[_betNumber] = _bet;
     }
 
     function updateBet(uint256 _betNumber, BetTypes.Bet memory _bet) public onlyBetManagementEngine {
+        if (_bet.taker.length == 0) revert Betcaster__ArrayCannotBeEmpty();
+        if (_bet.arbiter.length == 0) revert Betcaster__ArrayCannotBeEmpty();
         s_allBets[_betNumber].taker = _bet.taker;
         s_allBets[_betNumber].arbiter = _bet.arbiter;
         s_allBets[_betNumber].takerBetTokenAddress = _bet.takerBetTokenAddress;
@@ -140,11 +145,11 @@ contract Betcaster is Ownable {
         s_allBets[_betNumber].status = _status;
     }
 
-    function updateBetTaker(uint256 _betNumber, address _taker) public onlyBetManagementEngine {
+    function updateBetTaker(uint256 _betNumber, address[] memory _taker) public onlyBetManagementEngine {
         s_allBets[_betNumber].taker = _taker;
     }
 
-    function updateBetArbiter(uint256 _betNumber, address _arbiter) public onlyArbiterManagementEngine {
+    function updateBetArbiter(uint256 _betNumber, address[] memory _arbiter) public onlyArbiterManagementEngine {
         s_allBets[_betNumber].arbiter = _arbiter;
     }
 

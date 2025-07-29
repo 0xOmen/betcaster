@@ -52,18 +52,20 @@ contract ArbiterManagementEngine is Ownable, ReentrancyGuard {
         if (bet.status != BetTypes.Status.WAITING_FOR_ARBITER) {
             revert ArbiterManagementEngine__BetNotWaitingForArbiter();
         }
-        if (bet.arbiter == address(0)) {
-            if (bet.taker == msg.sender || bet.maker == msg.sender) {
+        if (bet.arbiter[0] == address(0)) {
+            if (bet.taker[0] == msg.sender || bet.maker == msg.sender) {
                 revert ArbiterManagementEngine__TakerCannotBeArbiter();
             }
             // Check allowlist if enforcement is enabled
             if (s_enforceAllowList && !s_allowList[msg.sender]) {
                 revert ArbiterManagementEngine__NotOnAllowList();
             }
-            Betcaster(i_betcaster).updateBetArbiter(_betNumber, msg.sender);
-        } else if (bet.arbiter != msg.sender) {
+        } else if (!_containsAddress(bet.arbiter, msg.sender)) {
             revert ArbiterManagementEngine__NotArbiter();
         }
+        address[] memory arbiter = new address[](1);
+        arbiter[0] = msg.sender;
+        Betcaster(i_betcaster).updateBetArbiter(_betNumber, arbiter);
         emit ArbiterAcceptedRole(_betNumber, msg.sender);
         Betcaster(i_betcaster).arbiterUpdateBetStatus(_betNumber, BetTypes.Status.IN_PROCESS);
     }
@@ -80,7 +82,7 @@ contract ArbiterManagementEngine is Ownable, ReentrancyGuard {
         if (bet.status != BetTypes.Status.IN_PROCESS) {
             revert ArbiterManagementEngine__BetNotInProcess();
         }
-        if (bet.arbiter != msg.sender) {
+        if (bet.arbiter[0] != msg.sender) {
             revert ArbiterManagementEngine__NotArbiter();
         }
         if (!bet.canSettleEarly && block.timestamp < bet.endTime) {
@@ -98,7 +100,7 @@ contract ArbiterManagementEngine is Ownable, ReentrancyGuard {
             revert ArbiterManagementEngine__WinnerNotValid();
         }
         uint256 arbiterPayment = Betcaster(i_betcaster).calculateArbiterPayment(2 * bet.betAmount, bet.arbiterFee);
-        Betcaster(i_betcaster).transferTokensToArbiter(arbiterPayment, bet.arbiter, bet.betTokenAddress);
+        Betcaster(i_betcaster).transferTokensToArbiter(arbiterPayment, bet.arbiter[0], bet.betTokenAddress);
     }
 
     // Allowlist management functions
@@ -119,5 +121,20 @@ contract ArbiterManagementEngine is Ownable, ReentrancyGuard {
 
     function isAllowListEnforced() public view returns (bool) {
         return s_enforceAllowList;
+    }
+
+    /**
+     * @notice Helper function to check if an address exists in an array
+     * @param _array The array to search in
+     * @param _address The address to search for
+     * @return True if the address is found in the array, false otherwise
+     */
+    function _containsAddress(address[] memory _array, address _address) internal pure returns (bool) {
+        for (uint256 i = 0; i < _array.length; i++) {
+            if (_array[i] == _address) {
+                return true;
+            }
+        }
+        return false;
     }
 }

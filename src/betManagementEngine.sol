@@ -33,6 +33,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
     error BetManagementEngine__BetTokenAddressCannotBeZeroAddress();
     error BetManagementEngine__MakerCannotBeZeroAddress();
     error BetManagementEngine__StringTooLong();
+    error BetManagementEngine__ZeroAddressInArrary();
 
     address immutable i_betcaster;
     uint256 immutable i_maxStringLength;
@@ -64,8 +65,8 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
      * @param _betAgreement The agreement text for the bet
      */
     function createBet(
-        address _taker,
-        address _arbiter,
+        address[] memory _taker,
+        address[] memory _arbiter,
         address _betTokenAddress,
         uint256 _betAmount,
         bool _canSettleEarly,
@@ -77,8 +78,14 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
         if (msg.sender == address(0)) revert BetManagementEngine__MakerCannotBeZeroAddress();
         if (_betAmount <= 0) revert BetManagementEngine__BetAmountMustBeGreaterThanZero();
         if (_endTime <= block.timestamp) revert BetManagementEngine__EndTimeMustBeInTheFuture();
-        if (_taker == msg.sender || _arbiter == msg.sender) {
+        if (_containsAddress(_taker, msg.sender) || _containsAddress(_arbiter, msg.sender)) {
             revert BetManagementEngine__TakerCannotBeArbiterOrMaker();
+        }
+        if (_taker.length > 1 && _containsAddress(_taker, address(0))) {
+            revert BetManagementEngine__ZeroAddressInArrary();
+        }
+        if (_arbiter.length > 1 && _containsAddress(_arbiter, address(0))) {
+            revert BetManagementEngine__ZeroAddressInArrary();
         }
         if (_betTokenAddress == address(0)) revert BetManagementEngine__BetTokenAddressCannotBeZeroAddress();
 
@@ -129,8 +136,8 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
      */
     function changeBetParameters(
         uint256 _betNumber,
-        address _taker,
-        address _arbiter,
+        address[] memory _taker,
+        address[] memory _arbiter,
         bool _canSettleEarly,
         uint256 _endTime,
         string memory _betAgreement
@@ -139,8 +146,14 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
         if (bet.maker != msg.sender) revert BetManagementEngine__NotMaker();
         if (bet.status != BetTypes.Status.WAITING_FOR_TAKER) revert BetManagementEngine__BetNotWaitingForTaker();
         if (_endTime <= block.timestamp) revert BetManagementEngine__EndTimeMustBeInTheFuture();
-        if (_taker == msg.sender || _arbiter == msg.sender) {
+        if (_containsAddress(_taker, msg.sender) || _containsAddress(_arbiter, msg.sender)) {
             revert BetManagementEngine__TakerCannotBeArbiterOrMaker();
+        }
+        if (_taker.length > 1 && _containsAddress(_taker, address(0))) {
+            revert BetManagementEngine__ZeroAddressInArrary();
+        }
+        if (_arbiter.length > 1 && _containsAddress(_arbiter, address(0))) {
+            revert BetManagementEngine__ZeroAddressInArrary();
         }
         enforceStringLength(_betAgreement);
 
@@ -176,15 +189,18 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
     function acceptBet(uint256 _betNumber) public nonReentrant {
         BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
         if (bet.status != BetTypes.Status.WAITING_FOR_TAKER) revert BetManagementEngine__BetNotWaitingForTaker();
-        if (bet.taker == address(0)) {
-            if (bet.maker == msg.sender || bet.arbiter == msg.sender) {
+        if (bet.taker[0] == address(0)) {
+            if (bet.maker == msg.sender || _containsAddress(bet.arbiter, msg.sender)) {
                 revert BetManagementEngine__TakerCannotBeArbiterOrMaker();
             }
-            bet.taker = msg.sender;
-            Betcaster(i_betcaster).updateBetTaker(_betNumber, msg.sender);
+        } else if (!_containsAddress(bet.taker, msg.sender)) {
+            revert BetManagementEngine__NotTaker();
         }
-        if (bet.taker != msg.sender) revert BetManagementEngine__NotTaker();
         if (block.timestamp > bet.endTime) revert BetManagementEngine__EndTimeMustBeInTheFuture();
+
+        address[] memory taker = new address[](1);
+        taker[0] = msg.sender;
+        Betcaster(i_betcaster).updateBetTaker(_betNumber, taker);
         bet.status = BetTypes.Status.WAITING_FOR_ARBITER;
         Betcaster(i_betcaster).updateBetStatus(_betNumber, bet.status);
         Betcaster(i_betcaster).updateBetTimestamp(_betNumber);
@@ -202,7 +218,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
      */
     function noArbiterCancelBet(uint256 _betNumber) public nonReentrant {
         BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
-        if (bet.maker != msg.sender && bet.taker != msg.sender) revert BetManagementEngine__NotMakerOrTaker();
+        if (bet.maker != msg.sender && bet.taker[0] != msg.sender) revert BetManagementEngine__NotMakerOrTaker();
         if (bet.status != BetTypes.Status.WAITING_FOR_ARBITER) revert BetManagementEngine__BetNotWaitingForArbiter();
         if (block.timestamp < bet.timestamp + 1 days) revert BetManagementEngine__StillInCooldown();
         bet.status = BetTypes.Status.CANCELLED;
@@ -211,7 +227,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
         emit BetCancelled(_betNumber, msg.sender, bet);
 
         Betcaster(i_betcaster).transferTokensToUser(bet.maker, bet.betTokenAddress, bet.betAmount);
-        Betcaster(i_betcaster).transferTokensToUser(bet.taker, bet.betTokenAddress, bet.betAmount);
+        Betcaster(i_betcaster).transferTokensToUser(bet.taker[0], bet.betTokenAddress, bet.betAmount);
     }
 
     /**
@@ -233,7 +249,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
             Betcaster(i_betcaster).updateBetStatus(_betNumber, BetTypes.Status.COMPLETED_MAKER_WINS);
             emit BetClaimed(_betNumber, winner, BetTypes.Status.COMPLETED_MAKER_WINS);
         } else if (bet.status == BetTypes.Status.TAKER_WINS) {
-            winner = bet.taker;
+            winner = bet.taker[0];
             Betcaster(i_betcaster).updateBetStatus(_betNumber, BetTypes.Status.COMPLETED_TAKER_WINS);
             emit BetClaimed(_betNumber, winner, BetTypes.Status.COMPLETED_TAKER_WINS);
         } else {
@@ -258,7 +274,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
         if (bet.status != BetTypes.Status.IN_PROCESS) revert BetManagementEngine__BetNotInProcess();
         if (bet.maker == msg.sender) {
             bet.status = BetTypes.Status.TAKER_WINS;
-        } else if (bet.taker == msg.sender) {
+        } else if (bet.taker[0] == msg.sender) {
             bet.status = BetTypes.Status.MAKER_WINS;
         } else {
             revert BetManagementEngine__NotMakerOrTaker();
@@ -277,7 +293,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
     function emergencyCancel(uint256 _betNumber) public nonReentrant {
         BetTypes.Bet memory bet = Betcaster(i_betcaster).getBet(_betNumber);
         if (bet.status != BetTypes.Status.IN_PROCESS) revert BetManagementEngine__BetNotInProcess();
-        if (msg.sender != bet.maker && msg.sender != bet.taker) revert BetManagementEngine__NotMakerOrTaker();
+        if (msg.sender != bet.maker && msg.sender != bet.taker[0]) revert BetManagementEngine__NotMakerOrTaker();
         if (block.timestamp < bet.endTime + Betcaster(i_betcaster).getEmergencyCancelCooldown()) {
             revert BetManagementEngine__StillInCooldown();
         }
@@ -285,7 +301,7 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
         emit BetCancelled(_betNumber, msg.sender, bet);
         Betcaster(i_betcaster).updateBetStatus(_betNumber, BetTypes.Status.CANCELLED);
         Betcaster(i_betcaster).transferTokensToUser(bet.maker, bet.betTokenAddress, bet.betAmount);
-        Betcaster(i_betcaster).transferTokensToUser(bet.taker, bet.betTokenAddress, bet.betAmount);
+        Betcaster(i_betcaster).transferTokensToUser(bet.taker[0], bet.betTokenAddress, bet.betAmount);
     }
 
     function enforceStringLength(string memory _string) public view {
@@ -300,5 +316,20 @@ contract BetManagementEngine is Ownable, ReentrancyGuard {
      */
     function getBetcaster() public view returns (address) {
         return i_betcaster;
+    }
+
+    /**
+     * @notice Helper function to check if an address exists in an array
+     * @param _array The array to search in
+     * @param _address The address to search for
+     * @return True if the address is found in the array, false otherwise
+     */
+    function _containsAddress(address[] memory _array, address _address) internal pure returns (bool) {
+        for (uint256 i = 0; i < _array.length; i++) {
+            if (_array[i] == _address) {
+                return true;
+            }
+        }
+        return false;
     }
 }

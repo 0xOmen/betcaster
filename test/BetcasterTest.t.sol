@@ -19,10 +19,10 @@ contract BetcasterTest is Test {
     // Test addresses
     address public owner;
     address public maker = makeAddr("maker");
-    address public taker = makeAddr("taker");
-    address public arbiter = makeAddr("arbiter");
-    address public user1 = makeAddr("user1");
-    address public user2 = makeAddr("user2");
+    address[] public taker = [makeAddr("taker")];
+    address[] public arbiter = [makeAddr("arbiter")];
+    address[] public user1 = [makeAddr("user1")];
+    address[] public user2 = [makeAddr("user2")];
 
     // Test constants
     uint256 public constant PROTOCOL_FEE = 50; // 0.5%
@@ -47,21 +47,21 @@ contract BetcasterTest is Test {
 
         // Mint tokens to test addresses
         mockToken.mint(maker, INITIAL_TOKEN_SUPPLY);
-        mockToken.mint(taker, INITIAL_TOKEN_SUPPLY);
-        mockToken.mint(user1, INITIAL_TOKEN_SUPPLY);
-        mockToken.mint(user2, INITIAL_TOKEN_SUPPLY);
+        mockToken.mint(taker[0], INITIAL_TOKEN_SUPPLY);
+        mockToken.mint(user1[0], INITIAL_TOKEN_SUPPLY);
+        mockToken.mint(user2[0], INITIAL_TOKEN_SUPPLY);
 
         // Approve betcaster contract to spend tokens
         vm.prank(maker);
         mockToken.approve(address(betcaster), type(uint256).max);
 
-        vm.prank(taker);
+        vm.prank(taker[0]);
         mockToken.approve(address(betcaster), type(uint256).max);
 
-        vm.prank(user1);
+        vm.prank(user1[0]);
         mockToken.approve(address(betcaster), type(uint256).max);
 
-        vm.prank(user2);
+        vm.prank(user2[0]);
         mockToken.approve(address(betcaster), type(uint256).max);
     }
 
@@ -79,10 +79,10 @@ contract BetcasterTest is Test {
             BET_AGREEMENT
         );
 
-        vm.prank(taker);
+        vm.prank(taker[0]);
         betManagementEngine.acceptBet(1);
 
-        vm.prank(arbiter);
+        vm.prank(arbiter[0]);
         arbiterManagementEngine.ArbiterAcceptRole(1);
 
         vm.warp(block.timestamp + 1 days);
@@ -108,42 +108,42 @@ contract BetcasterTest is Test {
                             ACCESS TESTS
     //////////////////////////////////////////////////////////////*/
     function testOnlyOwnerAccessControl() public {
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1));
-        vm.prank(user1);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1[0]));
+        vm.prank(user1[0]);
         betcaster.setBetManagementEngine(address(betManagementEngine));
 
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1));
-        vm.prank(user1);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1[0]));
+        vm.prank(user1[0]);
         betcaster.setArbiterManagementEngine(address(betManagementEngine));
 
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1));
-        vm.prank(user1);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1[0]));
+        vm.prank(user1[0]);
         betcaster.setProtocolFee(100);
 
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1));
-        vm.prank(user1);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1[0]));
+        vm.prank(user1[0]);
         betcaster.setEmergencyCancelCooldown(100);
 
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1));
-        vm.prank(user1);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1[0]));
+        vm.prank(user1[0]);
         betcaster.pauseProtocol();
 
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1));
-        vm.prank(user1);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1[0]));
+        vm.prank(user1[0]);
         betcaster.unpauseProtocol();
 
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1));
-        vm.prank(user1);
-        betcaster.setProtocolFeeDepositAddress(user1);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1[0]));
+        vm.prank(user1[0]);
+        betcaster.setProtocolFeeDepositAddress(user1[0]);
     }
 
     function testOnlyBetManagementEngineAccessControl() public {
         vm.expectRevert(Betcaster.Betcaster__NotBetManagementEngine.selector);
-        vm.prank(user1);
+        vm.prank(user1[0]);
         betcaster.increaseBetNumber();
 
         vm.expectRevert(Betcaster.Betcaster__NotBetManagementEngine.selector);
-        vm.prank(user1);
+        vm.prank(user1[0]);
         betcaster.createBet(
             1,
             BetTypes.Bet({
@@ -168,27 +168,27 @@ contract BetcasterTest is Test {
         _setupBet();
 
         vm.expectRevert(Betcaster.Betcaster__NotBetManagementEngine.selector);
-        vm.prank(user1);
+        vm.prank(user1[0]);
         betcaster.updateBetStatus(1, BetTypes.Status.WAITING_FOR_TAKER);
 
         vm.expectRevert(Betcaster.Betcaster__NotBetManagementEngine.selector);
-        vm.prank(user1);
+        vm.prank(user1[0]);
         betcaster.updateBetTaker(1, taker);
 
         vm.expectRevert(Betcaster.Betcaster__NotBetManagementEngine.selector);
-        vm.prank(user1);
+        vm.prank(user1[0]);
         betcaster.setBetArbiterFeeToZero(1);
 
         vm.expectRevert(Betcaster.Betcaster__NotBetManagementEngine.selector);
-        vm.prank(user1);
+        vm.prank(user1[0]);
         betcaster.transferTokensToUser(maker, address(mockToken), BET_AMOUNT);
 
         vm.expectRevert(Betcaster.Betcaster__NotBetManagementEngine.selector);
-        vm.prank(user1);
+        vm.prank(user1[0]);
         betcaster.depositToBetcaster(maker, address(mockToken), BET_AMOUNT);
 
         vm.expectRevert(Betcaster.Betcaster__NotBetManagementEngine.selector);
-        vm.prank(user1);
+        vm.prank(user1[0]);
         betcaster.updateBetTimestamp(1);
     }
 
@@ -196,16 +196,16 @@ contract BetcasterTest is Test {
         _setupBet();
 
         vm.expectRevert(Betcaster.Betcaster__NotArbiterManagementEngine.selector);
-        vm.prank(user1);
+        vm.prank(user1[0]);
         betcaster.updateBetArbiter(1, arbiter);
 
         vm.expectRevert(Betcaster.Betcaster__NotArbiterManagementEngine.selector);
-        vm.prank(user1);
+        vm.prank(user1[0]);
         betcaster.arbiterUpdateBetStatus(1, BetTypes.Status.WAITING_FOR_TAKER);
 
         vm.expectRevert(Betcaster.Betcaster__NotArbiterManagementEngine.selector);
-        vm.prank(user1);
-        betcaster.transferTokensToArbiter(1, arbiter, address(mockToken));
+        vm.prank(user1[0]);
+        betcaster.transferTokensToArbiter(1, arbiter[0], address(mockToken));
     }
 
     function testProtocolPaused() public {
@@ -264,13 +264,13 @@ contract BetcasterTest is Test {
         betManagementEngine.makerCancelBet(2);
 
         vm.expectRevert(Betcaster.Betcaster__ProtocolPaused.selector);
-        vm.prank(taker);
+        vm.prank(taker[0]);
         betManagementEngine.acceptBet(2);
 
         vm.prank(owner);
         betcaster.unpauseProtocol();
 
-        vm.prank(taker);
+        vm.prank(taker[0]);
         betManagementEngine.acceptBet(2);
 
         vm.prank(owner);
@@ -279,17 +279,17 @@ contract BetcasterTest is Test {
         vm.warp(block.timestamp + 1 days);
 
         vm.expectRevert(Betcaster.Betcaster__ProtocolPaused.selector);
-        vm.prank(taker);
+        vm.prank(taker[0]);
         betManagementEngine.noArbiterCancelBet(2);
 
         vm.expectRevert(Betcaster.Betcaster__ProtocolPaused.selector);
-        vm.prank(arbiter);
+        vm.prank(arbiter[0]);
         arbiterManagementEngine.ArbiterAcceptRole(2);
 
         vm.prank(owner);
         betcaster.unpauseProtocol();
 
-        vm.prank(arbiter);
+        vm.prank(arbiter[0]);
         arbiterManagementEngine.ArbiterAcceptRole(2);
 
         vm.prank(owner);
@@ -302,7 +302,7 @@ contract BetcasterTest is Test {
         vm.warp(block.timestamp + 31 days);
 
         vm.expectRevert(Betcaster.Betcaster__ProtocolPaused.selector);
-        vm.prank(arbiter);
+        vm.prank(arbiter[0]);
         arbiterManagementEngine.selectWinner(2, true);
 
         vm.expectRevert(Betcaster.Betcaster__ProtocolPaused.selector);
@@ -312,7 +312,7 @@ contract BetcasterTest is Test {
         vm.prank(owner);
         betcaster.unpauseProtocol();
 
-        vm.prank(arbiter);
+        vm.prank(arbiter[0]);
         arbiterManagementEngine.selectWinner(2, true);
 
         vm.prank(owner);
@@ -436,10 +436,11 @@ contract BetcasterTest is Test {
 
     function testGetNonExistentBetReturnsEmptyStruct() public view {
         BetTypes.Bet memory emptyBet = betcaster.getBet(999);
+        address[] memory emptyArray;
 
         assertEq(emptyBet.maker, address(0));
-        assertEq(emptyBet.taker, address(0));
-        assertEq(emptyBet.arbiter, address(0));
+        assertEq(emptyBet.taker, emptyArray);
+        assertEq(emptyBet.arbiter, emptyArray);
         assertEq(emptyBet.betTokenAddress, address(0));
         assertEq(emptyBet.betAmount, 0);
         assertEq(emptyBet.canSettleEarly, false);
@@ -449,5 +450,30 @@ contract BetcasterTest is Test {
         assertEq(emptyBet.protocolFee, 0);
         assertEq(emptyBet.arbiterFee, 0);
         assertEq(emptyBet.betAgreement, "");
+    }
+
+    function testEmptyArrayInBet() public {
+        address[] memory emptyTaker;
+        BetTypes.Bet memory bet = BetTypes.Bet({
+            maker: maker,
+            taker: emptyTaker,
+            arbiter: arbiter,
+            betTokenAddress: address(mockToken),
+            betAmount: BET_AMOUNT,
+            takerBetTokenAddress: address(mockToken),
+            takerBetAmount: BET_AMOUNT,
+            canSettleEarly: false,
+            timestamp: block.timestamp,
+            takerDeadline: block.timestamp + 1 days,
+            endTime: block.timestamp + 1 days,
+            status: BetTypes.Status.WAITING_FOR_TAKER,
+            protocolFee: PROTOCOL_FEE,
+            arbiterFee: ARBITER_FEE,
+            betAgreement: BET_AGREEMENT
+        });
+
+        vm.expectRevert(Betcaster.Betcaster__ArrayCannotBeEmpty.selector);
+        vm.prank(address(betManagementEngine));
+        betcaster.createBet(1, bet);
     }
 }

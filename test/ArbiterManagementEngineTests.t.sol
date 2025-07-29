@@ -18,10 +18,10 @@ contract ArbiterManagementEngineTest is Test {
 
     // Test addresses
     address public maker = makeAddr("maker");
-    address public taker = makeAddr("taker");
-    address public arbiter = makeAddr("arbiter");
-    address public user1 = makeAddr("user1");
-    address public user2 = makeAddr("user2");
+    address[] public taker = [makeAddr("taker")];
+    address[] public arbiter = [makeAddr("arbiter")];
+    address[] public user1 = [makeAddr("user1")];
+    address[] public user2 = [makeAddr("user2")];
     address public owner;
 
     // Test constants
@@ -53,21 +53,21 @@ contract ArbiterManagementEngineTest is Test {
 
         // Mint tokens to test addresses
         mockToken.mint(maker, INITIAL_TOKEN_SUPPLY);
-        mockToken.mint(taker, INITIAL_TOKEN_SUPPLY);
-        mockToken.mint(user1, INITIAL_TOKEN_SUPPLY);
-        mockToken.mint(user2, INITIAL_TOKEN_SUPPLY);
+        mockToken.mint(taker[0], INITIAL_TOKEN_SUPPLY);
+        mockToken.mint(user1[0], INITIAL_TOKEN_SUPPLY);
+        mockToken.mint(user2[0], INITIAL_TOKEN_SUPPLY);
 
         // Approve betcaster contract to spend tokens
         vm.prank(maker);
         mockToken.approve(address(betcaster), type(uint256).max);
 
-        vm.prank(taker);
+        vm.prank(taker[0]);
         mockToken.approve(address(betcaster), type(uint256).max);
 
-        vm.prank(user1);
+        vm.prank(user1[0]);
         mockToken.approve(address(betcaster), type(uint256).max);
 
-        vm.prank(user2);
+        vm.prank(user2[0]);
         mockToken.approve(address(betcaster), type(uint256).max);
 
         vm.warp(block.timestamp + 1 days);
@@ -88,14 +88,14 @@ contract ArbiterManagementEngineTest is Test {
 
     // Helper function to set up a bet ready for arbiter acceptance
     function _setupBetForArbiter() internal {
-        vm.prank(taker);
+        vm.prank(taker[0]);
         betManagementEngine.acceptBet(1);
     }
 
     // Helper function to set up a bet in process (arbiter has accepted)
     function _setupBetInProcess() internal {
         _setupBetForArbiter();
-        vm.prank(arbiter);
+        vm.prank(arbiter[0]);
         arbiterManagementEngine.ArbiterAcceptRole(1);
     }
 
@@ -104,23 +104,23 @@ contract ArbiterManagementEngineTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function testArbiterAcceptRole() public {
-        vm.prank(taker);
+        vm.prank(taker[0]);
         betManagementEngine.acceptBet(1);
 
         vm.expectEmit(true, true, false, false);
-        emit ArbiterAcceptedRole(1, arbiter);
+        emit ArbiterAcceptedRole(1, arbiter[0]);
 
-        vm.prank(arbiter);
+        vm.prank(arbiter[0]);
         arbiterManagementEngine.ArbiterAcceptRole(1);
 
         assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.IN_PROCESS));
-        assertEq(betcaster.getBet(1).arbiter, arbiter);
+        assertEq(betcaster.getBet(1).arbiter[0], arbiter[0]);
     }
 
     function testArbiterAcceptRole_RevertWhen_BetNotWaitingForArbiter() public {
         // Bet is still WAITING_FOR_TAKER
         vm.expectRevert(ArbiterManagementEngine.ArbiterManagementEngine__BetNotWaitingForArbiter.selector);
-        vm.prank(arbiter);
+        vm.prank(arbiter[0]);
         arbiterManagementEngine.ArbiterAcceptRole(1);
     }
 
@@ -128,16 +128,18 @@ contract ArbiterManagementEngineTest is Test {
         _setupBetForArbiter();
 
         vm.expectRevert(ArbiterManagementEngine.ArbiterManagementEngine__NotArbiter.selector);
-        vm.prank(user1); // Wrong arbiter
+        vm.prank(user1[0]); // Wrong arbiter
         arbiterManagementEngine.ArbiterAcceptRole(1);
     }
 
     function testArbiterAcceptRole_WithZeroAddressArbiter() public {
+        address[] memory emptyArbiter = new address[](1);
+        emptyArbiter[0] = address(0);
         // Create a bet with zero address arbiter (anyone can be arbiter)
         vm.prank(maker);
         betManagementEngine.createBet(
             taker,
-            address(0),
+            emptyArbiter,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -147,17 +149,17 @@ contract ArbiterManagementEngineTest is Test {
             BET_AGREEMENT
         );
 
-        vm.prank(taker);
+        vm.prank(taker[0]);
         betManagementEngine.acceptBet(2);
 
         vm.expectEmit(true, true, false, false);
-        emit ArbiterAcceptedRole(2, user1);
+        emit ArbiterAcceptedRole(2, user1[0]);
 
-        vm.prank(user1);
+        vm.prank(user1[0]);
         arbiterManagementEngine.ArbiterAcceptRole(2);
 
         assertEq(uint256(betcaster.getBet(2).status), uint256(BetTypes.Status.IN_PROCESS));
-        assertEq(betcaster.getBet(2).arbiter, user1);
+        assertEq(betcaster.getBet(2).arbiter[0], user1[0]);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -171,16 +173,16 @@ contract ArbiterManagementEngineTest is Test {
         vm.warp(block.timestamp + 2 days);
 
         uint256 expectedArbiterFee = (BET_AMOUNT * 2) * ARBITER_FEE / 10000;
-        uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter);
+        uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter[0]);
 
         vm.expectEmit(true, true, false, false);
         emit WinnerSelected(1, true, betcaster.getBet(1));
 
-        vm.prank(arbiter);
+        vm.prank(arbiter[0]);
         arbiterManagementEngine.selectWinner(1, true);
 
         assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.MAKER_WINS));
-        assertEq(mockToken.balanceOf(arbiter), arbiterBalanceBefore + expectedArbiterFee);
+        assertEq(mockToken.balanceOf(arbiter[0]), arbiterBalanceBefore + expectedArbiterFee);
     }
 
     function testSelectWinner_TakerWins() public {
@@ -190,23 +192,23 @@ contract ArbiterManagementEngineTest is Test {
         vm.warp(block.timestamp + 2 days);
 
         uint256 expectedArbiterFee = (BET_AMOUNT * 2) * ARBITER_FEE / 10000;
-        uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter);
+        uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter[0]);
 
         vm.expectEmit(true, true, false, false);
         emit WinnerSelected(1, false, betcaster.getBet(1));
 
-        vm.prank(arbiter);
+        vm.prank(arbiter[0]);
         arbiterManagementEngine.selectWinner(1, false);
 
         assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.TAKER_WINS));
-        assertEq(mockToken.balanceOf(arbiter), arbiterBalanceBefore + expectedArbiterFee);
+        assertEq(mockToken.balanceOf(arbiter[0]), arbiterBalanceBefore + expectedArbiterFee);
     }
 
     function testSelectWinner_RevertWhen_BetNotInProcess() public {
         _setupBetForArbiter(); // Bet is still WAITING_FOR_ARBITER
 
         vm.expectRevert(ArbiterManagementEngine.ArbiterManagementEngine__BetNotInProcess.selector);
-        vm.prank(arbiter);
+        vm.prank(arbiter[0]);
         arbiterManagementEngine.selectWinner(1, true);
     }
 
@@ -215,7 +217,7 @@ contract ArbiterManagementEngineTest is Test {
 
         // Don't warp time - still before end time
         vm.expectRevert(ArbiterManagementEngine.ArbiterManagementEngine__EndTimeNotReached.selector);
-        vm.prank(arbiter);
+        vm.prank(arbiter[0]);
         arbiterManagementEngine.selectWinner(1, true);
     }
 
@@ -226,7 +228,7 @@ contract ArbiterManagementEngineTest is Test {
         vm.warp(block.timestamp + 2 days);
 
         vm.expectRevert(ArbiterManagementEngine.ArbiterManagementEngine__NotArbiter.selector);
-        vm.prank(user1); // Wrong arbiter
+        vm.prank(user1[0]); // Wrong arbiter
         arbiterManagementEngine.selectWinner(1, true);
     }
 
@@ -236,12 +238,12 @@ contract ArbiterManagementEngineTest is Test {
 
     function testFullBetFlow_MakerWins() public {
         // 1. Taker accepts bet
-        vm.prank(taker);
+        vm.prank(taker[0]);
         betManagementEngine.acceptBet(1);
         assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.WAITING_FOR_ARBITER));
 
         // 2. Arbiter accepts role
-        vm.prank(arbiter);
+        vm.prank(arbiter[0]);
         arbiterManagementEngine.ArbiterAcceptRole(1);
         assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.IN_PROCESS));
 
@@ -250,22 +252,22 @@ contract ArbiterManagementEngineTest is Test {
 
         // 4. Arbiter selects winner
         uint256 expectedArbiterFee = (BET_AMOUNT * 2) * ARBITER_FEE / 10000;
-        uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter);
+        uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter[0]);
 
-        vm.prank(arbiter);
+        vm.prank(arbiter[0]);
         arbiterManagementEngine.selectWinner(1, true);
 
         assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.MAKER_WINS));
-        assertEq(mockToken.balanceOf(arbiter), arbiterBalanceBefore + expectedArbiterFee);
+        assertEq(mockToken.balanceOf(arbiter[0]), arbiterBalanceBefore + expectedArbiterFee);
     }
 
     function testFullBetFlow_TakerWins() public {
         // 1. Taker accepts bet
-        vm.prank(taker);
+        vm.prank(taker[0]);
         betManagementEngine.acceptBet(1);
 
         // 2. Arbiter accepts role
-        vm.prank(arbiter);
+        vm.prank(arbiter[0]);
         arbiterManagementEngine.ArbiterAcceptRole(1);
 
         // 3. Time passes
@@ -273,13 +275,13 @@ contract ArbiterManagementEngineTest is Test {
 
         // 4. Arbiter selects winner
         uint256 expectedArbiterFee = (BET_AMOUNT * 2) * ARBITER_FEE / 10000;
-        uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter);
+        uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter[0]);
 
-        vm.prank(arbiter);
+        vm.prank(arbiter[0]);
         arbiterManagementEngine.selectWinner(1, false);
 
         assertEq(uint256(betcaster.getBet(1).status), uint256(BetTypes.Status.TAKER_WINS));
-        assertEq(mockToken.balanceOf(arbiter), arbiterBalanceBefore + expectedArbiterFee);
+        assertEq(mockToken.balanceOf(arbiter[0]), arbiterBalanceBefore + expectedArbiterFee);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -306,22 +308,22 @@ contract ArbiterManagementEngineTest is Test {
         );
 
         // Accept bet and arbiter role
-        vm.prank(taker);
+        vm.prank(taker[0]);
         betManagementEngine.acceptBet(2);
 
-        vm.prank(arbiter);
+        vm.prank(arbiter[0]);
         arbiterManagementEngine.ArbiterAcceptRole(2);
 
         // Warp time and select winner
         vm.warp(block.timestamp + 2 days);
 
         uint256 expectedFee = (betAmount * 2) * arbiterFeePercent / 10000;
-        uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter);
+        uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter[0]);
 
-        vm.prank(arbiter);
+        vm.prank(arbiter[0]);
         arbiterManagementEngine.selectWinner(2, true);
 
-        assertEq(mockToken.balanceOf(arbiter), arbiterBalanceBefore + expectedFee);
+        assertEq(mockToken.balanceOf(arbiter[0]), arbiterBalanceBefore + expectedFee);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -343,21 +345,21 @@ contract ArbiterManagementEngineTest is Test {
             BET_AGREEMENT
         );
 
-        vm.prank(taker);
+        vm.prank(taker[0]);
         betManagementEngine.acceptBet(2);
 
-        vm.prank(arbiter);
+        vm.prank(arbiter[0]);
         arbiterManagementEngine.ArbiterAcceptRole(2);
 
         vm.warp(block.timestamp + 2 days);
 
-        uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter);
+        uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter[0]);
 
-        vm.prank(arbiter);
+        vm.prank(arbiter[0]);
         arbiterManagementEngine.selectWinner(2, true);
 
         // Arbiter should receive 0 fee
-        assertEq(mockToken.balanceOf(arbiter), arbiterBalanceBefore);
+        assertEq(mockToken.balanceOf(arbiter[0]), arbiterBalanceBefore);
         assertEq(uint256(betcaster.getBet(2).status), uint256(BetTypes.Status.MAKER_WINS));
     }
 
@@ -379,23 +381,23 @@ contract ArbiterManagementEngineTest is Test {
             BET_AGREEMENT
         );
 
-        vm.prank(taker);
+        vm.prank(taker[0]);
         betManagementEngine.acceptBet(2);
 
         uint256 betcasterStartingBalance = mockToken.balanceOf(address(betcaster));
 
-        vm.prank(arbiter);
+        vm.prank(arbiter[0]);
         arbiterManagementEngine.ArbiterAcceptRole(2);
 
         vm.warp(block.timestamp + 2 days);
 
         uint256 expectedFee = (BET_AMOUNT * 2) * maxFee / 10000;
-        uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter);
+        uint256 arbiterBalanceBefore = mockToken.balanceOf(arbiter[0]);
 
-        vm.prank(arbiter);
+        vm.prank(arbiter[0]);
         arbiterManagementEngine.selectWinner(2, true);
 
-        assertEq(mockToken.balanceOf(arbiter), arbiterBalanceBefore + expectedFee);
+        assertEq(mockToken.balanceOf(arbiter[0]), arbiterBalanceBefore + expectedFee);
         assertEq(mockToken.balanceOf(address(betcaster)), betcasterStartingBalance - expectedFee); // Verify balance of Betcaster contract
     }
 
@@ -408,29 +410,29 @@ contract ArbiterManagementEngineTest is Test {
         assertEq(arbiterManagementEngine.isAllowListEnforced(), false);
 
         // Any address should not be on allowlist by default
-        assertEq(arbiterManagementEngine.isOnAllowList(user1), false);
-        assertEq(arbiterManagementEngine.isOnAllowList(user2), false);
-        assertEq(arbiterManagementEngine.isOnAllowList(arbiter), false);
+        assertEq(arbiterManagementEngine.isOnAllowList(user1[0]), false);
+        assertEq(arbiterManagementEngine.isOnAllowList(user2[0]), false);
+        assertEq(arbiterManagementEngine.isOnAllowList(arbiter[0]), false);
     }
 
     function testSetAllowListStatus() public {
         // Test adding address to allowlist
         vm.prank(owner);
-        arbiterManagementEngine.setAllowListStatus(user1, true);
-        assertEq(arbiterManagementEngine.isOnAllowList(user1), true);
-        assertEq(arbiterManagementEngine.isOnAllowList(user2), false);
+        arbiterManagementEngine.setAllowListStatus(user1[0], true);
+        assertEq(arbiterManagementEngine.isOnAllowList(user1[0]), true);
+        assertEq(arbiterManagementEngine.isOnAllowList(user2[0]), false);
 
         // Test removing address from allowlist
         vm.prank(owner); // owner
-        arbiterManagementEngine.setAllowListStatus(user1, false);
-        assertEq(arbiterManagementEngine.isOnAllowList(user1), false);
+        arbiterManagementEngine.setAllowListStatus(user1[0], false);
+        assertEq(arbiterManagementEngine.isOnAllowList(user1[0]), false);
     }
 
     function testSetAllowListStatus_OnlyOwner() public {
         // Non-owner should not be able to set allowlist status
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1));
-        vm.prank(user1);
-        arbiterManagementEngine.setAllowListStatus(user2, true);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1[0]));
+        vm.prank(user1[0]);
+        arbiterManagementEngine.setAllowListStatus(user2[0], true);
     }
 
     function testSetAllowListEnforcement() public {
@@ -447,8 +449,8 @@ contract ArbiterManagementEngineTest is Test {
 
     function testSetAllowListEnforcement_OnlyOwner() public {
         // Non-owner should not be able to set enforcement
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1));
-        vm.prank(user1);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1[0]));
+        vm.prank(user1[0]);
         arbiterManagementEngine.setAllowListEnforcement(true);
     }
 
@@ -459,13 +461,15 @@ contract ArbiterManagementEngineTest is Test {
 
         // Add user1 to allowlist
         vm.prank(owner); // owner
-        arbiterManagementEngine.setAllowListStatus(user1, true);
+        arbiterManagementEngine.setAllowListStatus(user1[0], true);
 
         // Create bet with zero address arbiter
+        address[] memory emptyArbiter = new address[](1);
+        emptyArbiter[0] = address(0);
         vm.prank(maker);
         betManagementEngine.createBet(
             taker,
-            address(0), // zero address arbiter
+            emptyArbiter, // zero address arbiter
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -475,18 +479,18 @@ contract ArbiterManagementEngineTest is Test {
             BET_AGREEMENT
         );
 
-        vm.prank(taker);
+        vm.prank(taker[0]);
         betManagementEngine.acceptBet(2);
 
         // user1 should be able to accept arbiter role (on allowlist)
         vm.expectEmit(true, true, false, false);
-        emit ArbiterAcceptedRole(2, user1);
+        emit ArbiterAcceptedRole(2, user1[0]);
 
-        vm.prank(user1);
+        vm.prank(user1[0]);
         arbiterManagementEngine.ArbiterAcceptRole(2);
 
         assertEq(uint256(betcaster.getBet(2).status), uint256(BetTypes.Status.IN_PROCESS));
-        assertEq(betcaster.getBet(2).arbiter, user1);
+        assertEq(betcaster.getBet(2).arbiter[0], user1[0]);
     }
 
     function testArbiterAcceptRole_WithAllowListEnforced_AddressNotOnAllowList() public {
@@ -497,10 +501,12 @@ contract ArbiterManagementEngineTest is Test {
         // user1 is not on allowlist
 
         // Create bet with zero address arbiter
+        address[] memory emptyArbiter = new address[](1);
+        emptyArbiter[0] = address(0);
         vm.prank(maker);
         betManagementEngine.createBet(
             taker,
-            address(0), // zero address arbiter
+            emptyArbiter, // zero address arbiter
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -510,12 +516,12 @@ contract ArbiterManagementEngineTest is Test {
             BET_AGREEMENT
         );
 
-        vm.prank(taker);
+        vm.prank(taker[0]);
         betManagementEngine.acceptBet(2);
 
         // user1 should not be able to accept arbiter role (not on allowlist)
         vm.expectRevert(ArbiterManagementEngine.ArbiterManagementEngine__NotOnAllowList.selector);
-        vm.prank(user1);
+        vm.prank(user1[0]);
         arbiterManagementEngine.ArbiterAcceptRole(2);
     }
 
@@ -524,10 +530,12 @@ contract ArbiterManagementEngineTest is Test {
         assertEq(arbiterManagementEngine.isAllowListEnforced(), false);
 
         // Create bet with zero address arbiter
+        address[] memory emptyArbiter = new address[](1);
+        emptyArbiter[0] = address(0);
         vm.prank(maker);
         betManagementEngine.createBet(
             taker,
-            address(0), // zero address arbiter
+            emptyArbiter, // zero address arbiter
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -537,18 +545,18 @@ contract ArbiterManagementEngineTest is Test {
             BET_AGREEMENT
         );
 
-        vm.prank(taker);
+        vm.prank(taker[0]);
         betManagementEngine.acceptBet(2);
 
         // Any address should be able to accept arbiter role when allowlist is not enforced
         vm.expectEmit(true, true, false, false);
-        emit ArbiterAcceptedRole(2, user1);
+        emit ArbiterAcceptedRole(2, user1[0]);
 
-        vm.prank(user1);
+        vm.prank(user1[0]);
         arbiterManagementEngine.ArbiterAcceptRole(2);
 
         assertEq(uint256(betcaster.getBet(2).status), uint256(BetTypes.Status.IN_PROCESS));
-        assertEq(betcaster.getBet(2).arbiter, user1);
+        assertEq(betcaster.getBet(2).arbiter[0], user1[0]);
     }
 
     function testArbiterAcceptRole_WithSpecificArbiter_AllowListNotEnforced() public {
@@ -570,18 +578,18 @@ contract ArbiterManagementEngineTest is Test {
             BET_AGREEMENT
         );
 
-        vm.prank(taker);
+        vm.prank(taker[0]);
         betManagementEngine.acceptBet(2);
 
         // user2 should be able to accept arbiter role (specific arbiter, allowlist doesn't apply)
         vm.expectEmit(true, true, false, false);
-        emit ArbiterAcceptedRole(2, user2);
+        emit ArbiterAcceptedRole(2, user2[0]);
 
-        vm.prank(user2);
+        vm.prank(user2[0]);
         arbiterManagementEngine.ArbiterAcceptRole(2);
 
         assertEq(uint256(betcaster.getBet(2).status), uint256(BetTypes.Status.IN_PROCESS));
-        assertEq(betcaster.getBet(2).arbiter, user2);
+        assertEq(betcaster.getBet(2).arbiter[0], user2[0]);
     }
 
     function testArbiterAcceptRole_WithSpecificArbiter_AllowListEnforced() public {
@@ -603,27 +611,27 @@ contract ArbiterManagementEngineTest is Test {
             BET_AGREEMENT
         );
 
-        vm.prank(taker);
+        vm.prank(taker[0]);
         betManagementEngine.acceptBet(2);
 
         // user1 should be able to accept arbiter role (specific arbiter, allowlist doesn't apply)
         vm.expectEmit(true, true, false, false);
-        emit ArbiterAcceptedRole(2, user1);
+        emit ArbiterAcceptedRole(2, user1[0]);
 
-        vm.prank(user1);
+        vm.prank(user1[0]);
         arbiterManagementEngine.ArbiterAcceptRole(2);
 
         assertEq(uint256(betcaster.getBet(2).status), uint256(BetTypes.Status.IN_PROCESS));
-        assertEq(betcaster.getBet(2).arbiter, user1);
+        assertEq(betcaster.getBet(2).arbiter[0], user1[0]);
     }
 
     function testAllowListEvents() public {
         // Test AllowListUpdated event
         vm.expectEmit(true, false, false, false);
-        emit AllowListUpdated(user1, true);
+        emit AllowListUpdated(user1[0], true);
 
         vm.prank(owner); // owner
-        arbiterManagementEngine.setAllowListStatus(user1, true);
+        arbiterManagementEngine.setAllowListStatus(user1[0], true);
 
         // Test AllowListEnforcementUpdated event
         vm.expectEmit(false, false, false, false);
@@ -646,15 +654,15 @@ contract ArbiterManagementEngineTest is Test {
 
         // Test multiple addresses
         vm.prank(owner); // owner
-        arbiterManagementEngine.setAllowListStatus(user1, true);
+        arbiterManagementEngine.setAllowListStatus(user1[0], true);
         vm.prank(owner); // owner
-        arbiterManagementEngine.setAllowListStatus(user2, true);
+        arbiterManagementEngine.setAllowListStatus(user2[0], true);
         vm.prank(owner); // owner
-        arbiterManagementEngine.setAllowListStatus(arbiter, false);
+        arbiterManagementEngine.setAllowListStatus(arbiter[0], false);
 
-        assertEq(arbiterManagementEngine.isOnAllowList(user1), true);
-        assertEq(arbiterManagementEngine.isOnAllowList(user2), true);
-        assertEq(arbiterManagementEngine.isOnAllowList(arbiter), false);
+        assertEq(arbiterManagementEngine.isOnAllowList(user1[0]), true);
+        assertEq(arbiterManagementEngine.isOnAllowList(user2[0]), true);
+        assertEq(arbiterManagementEngine.isOnAllowList(arbiter[0]), false);
     }
 
     function testAllowList_IntegrationWithExistingBet() public {
@@ -664,13 +672,15 @@ contract ArbiterManagementEngineTest is Test {
 
         // Add user1 to allowlist
         vm.prank(owner); // owner
-        arbiterManagementEngine.setAllowListStatus(user1, true);
+        arbiterManagementEngine.setAllowListStatus(user1[0], true);
 
         // Create bet with zero address arbiter
+        address[] memory emptyArbiter = new address[](1);
+        emptyArbiter[0] = address(0);
         vm.prank(maker);
         betManagementEngine.createBet(
             taker,
-            address(0), // zero address arbiter
+            emptyArbiter, // zero address arbiter
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -680,16 +690,16 @@ contract ArbiterManagementEngineTest is Test {
             BET_AGREEMENT
         );
 
-        vm.prank(taker);
+        vm.prank(taker[0]);
         betManagementEngine.acceptBet(2);
 
         // user2 should not be able to accept role (not on allowlist)
         vm.expectRevert(ArbiterManagementEngine.ArbiterManagementEngine__NotOnAllowList.selector);
-        vm.prank(user2);
+        vm.prank(user2[0]);
         arbiterManagementEngine.ArbiterAcceptRole(2);
 
         // user1 should be able to accept role
-        vm.prank(user1);
+        vm.prank(user1[0]);
         arbiterManagementEngine.ArbiterAcceptRole(2);
 
         // Disable allowlist enforcement
@@ -699,7 +709,7 @@ contract ArbiterManagementEngineTest is Test {
         // Now user2 should be able to accept role
         // But bet is already in process, so it should revert
         vm.expectRevert(ArbiterManagementEngine.ArbiterManagementEngine__BetNotWaitingForArbiter.selector);
-        vm.prank(user2);
+        vm.prank(user2[0]);
         arbiterManagementEngine.ArbiterAcceptRole(2);
     }
 }

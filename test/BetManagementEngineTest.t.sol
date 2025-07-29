@@ -17,10 +17,15 @@ contract BetManagementEngineTest is Test {
 
     // Test addresses
     address public maker = makeAddr("maker");
+    address[] public makerArray = [maker];
     address public taker = makeAddr("taker");
+    address[] public takerArray = [taker];
     address public arbiter = makeAddr("arbiter");
+    address[] public arbiterArray = [arbiter];
     address public user1 = makeAddr("user1");
     address public user2 = makeAddr("user2");
+    address[] public user1Array = [user1];
+    address[] public user2Array = [user2];
 
     // Test constants
     uint256 public constant PROTOCOL_FEE = 50; //0.5%
@@ -72,8 +77,8 @@ contract BetManagementEngineTest is Test {
     function testCreateBet() public {
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -86,8 +91,8 @@ contract BetManagementEngineTest is Test {
         BetTypes.Bet memory createdBet = betcaster.getBet(1);
         assertEq(betcaster.getCurrentBetNumber(), 1);
         assertEq(createdBet.maker, maker);
-        assertEq(createdBet.taker, taker);
-        assertEq(createdBet.arbiter, arbiter);
+        assertEq(createdBet.taker, takerArray);
+        assertEq(createdBet.arbiter, arbiterArray);
         assertEq(createdBet.betTokenAddress, address(mockToken));
         assertEq(createdBet.betAmount, BET_AMOUNT);
         assertEq(createdBet.protocolFee, PROTOCOL_FEE);
@@ -101,8 +106,8 @@ contract BetManagementEngineTest is Test {
         vm.prank(maker);
         vm.expectRevert(BetManagementEngine.BetManagementEngine__BetAmountMustBeGreaterThanZero.selector);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             0, // Zero bet amount
             CAN_SETTLE_EARLY,
@@ -121,8 +126,8 @@ contract BetManagementEngineTest is Test {
         vm.prank(maker);
         vm.expectRevert(BetManagementEngine.BetManagementEngine__EndTimeMustBeInTheFuture.selector);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -137,8 +142,8 @@ contract BetManagementEngineTest is Test {
         vm.prank(maker);
         vm.expectRevert(BetManagementEngine.BetManagementEngine__EndTimeMustBeInTheFuture.selector);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -156,8 +161,8 @@ contract BetManagementEngineTest is Test {
         vm.prank(poorUser);
         vm.expectRevert(); // ERC20 transfer will revert
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -176,8 +181,8 @@ contract BetManagementEngineTest is Test {
         vm.prank(userWithoutApproval);
         vm.expectRevert(); // ERC20 transferFrom will revert due to insufficient allowance
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -198,8 +203,8 @@ contract BetManagementEngineTest is Test {
         // Create bet first
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -235,8 +240,8 @@ contract BetManagementEngineTest is Test {
         // Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -262,8 +267,8 @@ contract BetManagementEngineTest is Test {
         // Create and accept bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -298,8 +303,8 @@ contract BetManagementEngineTest is Test {
         // Create bet with specific taker
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -315,8 +320,8 @@ contract BetManagementEngineTest is Test {
         // Expect multiple events: Transfer (from ERC20) and BetAccepted
         BetTypes.Bet memory bet = BetTypes.Bet({
             maker: maker,
-            taker: taker,
-            arbiter: arbiter,
+            taker: takerArray,
+            arbiter: arbiterArray,
             betTokenAddress: address(mockToken),
             betAmount: BET_AMOUNT,
             takerBetTokenAddress: address(mockToken),
@@ -342,7 +347,7 @@ contract BetManagementEngineTest is Test {
         // Verify bet status changed
         BetTypes.Bet memory acceptedBet = betcaster.getBet(1);
         assertEq(uint256(acceptedBet.status), uint256(BetTypes.Status.WAITING_FOR_ARBITER));
-        assertEq(acceptedBet.taker, taker);
+        assertEq(acceptedBet.taker[0], taker);
 
         // Verify tokens were transferred from taker
         assertEq(mockToken.balanceOf(taker), takerBalanceBefore - BET_AMOUNT);
@@ -353,10 +358,12 @@ contract BetManagementEngineTest is Test {
         uint256 endTime = block.timestamp + 1 days;
 
         // Create bet with open taker (address(0))
+        address[] memory zeroTaker = new address[](1);
+        zeroTaker[0] = address(0);
         vm.prank(maker);
         betManagementEngine.createBet(
-            address(0),
-            arbiter,
+            zeroTaker,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -376,7 +383,7 @@ contract BetManagementEngineTest is Test {
         // Verify bet status and taker updated
         BetTypes.Bet memory acceptedBet = betcaster.getBet(1);
         assertEq(uint256(acceptedBet.status), uint256(BetTypes.Status.WAITING_FOR_ARBITER));
-        assertEq(acceptedBet.taker, user1);
+        assertEq(acceptedBet.taker[0], user1);
 
         // Verify tokens were transferred
         assertEq(mockToken.balanceOf(user1), user1BalanceBefore - BET_AMOUNT);
@@ -389,8 +396,8 @@ contract BetManagementEngineTest is Test {
         // Create and accept bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -415,8 +422,8 @@ contract BetManagementEngineTest is Test {
         // Create bet with specific taker
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -439,8 +446,8 @@ contract BetManagementEngineTest is Test {
         // Create bet with poor taker
         vm.prank(maker);
         betManagementEngine.createBet(
-            poorTaker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -466,8 +473,8 @@ contract BetManagementEngineTest is Test {
         // Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -516,8 +523,8 @@ contract BetManagementEngineTest is Test {
         // Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -559,8 +566,8 @@ contract BetManagementEngineTest is Test {
         // Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -582,8 +589,8 @@ contract BetManagementEngineTest is Test {
         // Create bet (status is WAITING_FOR_TAKER)
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -605,8 +612,8 @@ contract BetManagementEngineTest is Test {
         // Create and accept bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -643,8 +650,8 @@ contract BetManagementEngineTest is Test {
         // Create first bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -657,8 +664,8 @@ contract BetManagementEngineTest is Test {
         // Create second bet
         vm.prank(user1);
         betManagementEngine.createBet(
-            user2,
-            arbiter,
+            user2Array,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT / 2,
             CAN_SETTLE_EARLY,
@@ -692,8 +699,8 @@ contract BetManagementEngineTest is Test {
         // Create multiple bets
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -705,8 +712,8 @@ contract BetManagementEngineTest is Test {
 
         vm.prank(user1);
         betManagementEngine.createBet(
-            user2,
-            arbiter,
+            user2Array,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -740,8 +747,8 @@ contract BetManagementEngineTest is Test {
         // Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -776,8 +783,8 @@ contract BetManagementEngineTest is Test {
         // Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -881,8 +888,8 @@ contract BetManagementEngineTest is Test {
         // Create bet but don't complete it
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -904,8 +911,8 @@ contract BetManagementEngineTest is Test {
         // Create and accept bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -965,8 +972,8 @@ contract BetManagementEngineTest is Test {
 
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -1009,7 +1016,15 @@ contract BetManagementEngineTest is Test {
         // Create bet with zero arbiter fee
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, CAN_SETTLE_EARLY, endTime, PROTOCOL_FEE, 0, BET_AGREEMENT
+            takerArray,
+            arbiterArray,
+            address(mockToken),
+            BET_AMOUNT,
+            CAN_SETTLE_EARLY,
+            endTime,
+            PROTOCOL_FEE,
+            0,
+            BET_AGREEMENT
         );
 
         // Complete the bet flow
@@ -1070,8 +1085,8 @@ contract BetManagementEngineTest is Test {
         // Create bet with fuzzed parameters
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             betAmount,
             CAN_SETTLE_EARLY,
@@ -1127,8 +1142,8 @@ contract BetManagementEngineTest is Test {
         // 1. Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -1184,8 +1199,8 @@ contract BetManagementEngineTest is Test {
         // Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -1256,8 +1271,8 @@ contract BetManagementEngineTest is Test {
         // Create bet but don't put it in process
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -1279,8 +1294,8 @@ contract BetManagementEngineTest is Test {
         // Create and accept bet but don't have arbiter accept
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -1350,8 +1365,8 @@ contract BetManagementEngineTest is Test {
         // Create bet with high arbiter fee
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -1396,8 +1411,8 @@ contract BetManagementEngineTest is Test {
         // 1. Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -1450,8 +1465,8 @@ contract BetManagementEngineTest is Test {
         // 1. Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -1498,8 +1513,8 @@ contract BetManagementEngineTest is Test {
         // Create two identical bets
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -1511,8 +1526,8 @@ contract BetManagementEngineTest is Test {
 
         vm.prank(maker);
         betManagementEngine.createBet(
-            user2,
-            arbiter,
+            user2Array,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -1577,7 +1592,7 @@ contract BetManagementEngineTest is Test {
         // Create bet with zero arbiter fee
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker, arbiter, address(mockToken), BET_AMOUNT, CAN_SETTLE_EARLY, endTime, 0, 0, BET_AGREEMENT
+            takerArray, arbiterArray, address(mockToken), BET_AMOUNT, CAN_SETTLE_EARLY, endTime, 0, 0, BET_AGREEMENT
         );
 
         // Complete bet setup
@@ -1654,8 +1669,8 @@ contract BetManagementEngineTest is Test {
         // Create bet with fuzzed arbiter fee
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -1709,8 +1724,8 @@ contract BetManagementEngineTest is Test {
         // Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -1799,8 +1814,8 @@ contract BetManagementEngineTest is Test {
         // Create bet but don't put it in process
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -1829,8 +1844,8 @@ contract BetManagementEngineTest is Test {
         // Create and accept bet but don't have arbiter accept
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -2011,8 +2026,8 @@ contract BetManagementEngineTest is Test {
         // 1. Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -2057,8 +2072,8 @@ contract BetManagementEngineTest is Test {
         // Create two identical bets
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -2070,8 +2085,8 @@ contract BetManagementEngineTest is Test {
 
         vm.prank(maker);
         betManagementEngine.createBet(
-            user2,
-            arbiter,
+            user2Array,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -2255,8 +2270,8 @@ contract BetManagementEngineTest is Test {
         // Create bet with fuzzed amount
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             betAmount,
             CAN_SETTLE_EARLY,
@@ -2304,8 +2319,8 @@ contract BetManagementEngineTest is Test {
         // 1. Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             betAmount,
             CAN_SETTLE_EARLY,
@@ -2369,8 +2384,8 @@ contract BetManagementEngineTest is Test {
         // 1. Create bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             betAmount,
             CAN_SETTLE_EARLY,
@@ -2423,8 +2438,8 @@ contract BetManagementEngineTest is Test {
         // Create initial bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -2435,20 +2450,18 @@ contract BetManagementEngineTest is Test {
         );
 
         // New parameters
-        address newTaker = user1;
-        address newArbiter = user2;
         bool newCanSettleEarly = true;
         uint256 newEndTime = block.timestamp + 2 days;
         string memory newAgreement = "New agreement text";
 
         // Change parameters
         vm.prank(maker);
-        betManagementEngine.changeBetParameters(1, newTaker, newArbiter, newCanSettleEarly, newEndTime, newAgreement);
+        betManagementEngine.changeBetParameters(1, user1Array, user2Array, newCanSettleEarly, newEndTime, newAgreement);
 
         // Verify changes
         BetTypes.Bet memory updatedBet = betcaster.getBet(1);
-        assertEq(updatedBet.taker, newTaker);
-        assertEq(updatedBet.arbiter, newArbiter);
+        assertEq(updatedBet.taker[0], user1);
+        assertEq(updatedBet.arbiter[0], user2);
         assertEq(updatedBet.canSettleEarly, newCanSettleEarly);
         assertEq(updatedBet.endTime, newEndTime);
         assertEq(updatedBet.betAgreement, newAgreement);
@@ -2458,8 +2471,8 @@ contract BetManagementEngineTest is Test {
         // Create initial bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -2473,7 +2486,7 @@ contract BetManagementEngineTest is Test {
         vm.prank(taker);
         vm.expectRevert(BetManagementEngine.BetManagementEngine__NotMaker.selector);
         betManagementEngine.changeBetParameters(
-            1, user1, user2, CAN_SETTLE_EARLY, block.timestamp + 2 days, "New agreement"
+            1, user1Array, user2Array, CAN_SETTLE_EARLY, block.timestamp + 2 days, "New agreement"
         );
     }
 
@@ -2481,8 +2494,8 @@ contract BetManagementEngineTest is Test {
         // Create and accept bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -2499,7 +2512,7 @@ contract BetManagementEngineTest is Test {
         vm.prank(maker);
         vm.expectRevert(BetManagementEngine.BetManagementEngine__BetNotWaitingForTaker.selector);
         betManagementEngine.changeBetParameters(
-            1, user1, user2, CAN_SETTLE_EARLY, block.timestamp + 2 days, "New agreement"
+            1, user1Array, user2Array, CAN_SETTLE_EARLY, block.timestamp + 2 days, "New agreement"
         );
     }
 
@@ -2508,8 +2521,8 @@ contract BetManagementEngineTest is Test {
         // Create initial bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -2523,7 +2536,7 @@ contract BetManagementEngineTest is Test {
         vm.prank(maker);
         vm.expectRevert(BetManagementEngine.BetManagementEngine__EndTimeMustBeInTheFuture.selector);
         betManagementEngine.changeBetParameters(
-            1, user1, user2, CAN_SETTLE_EARLY, block.timestamp - 1 hours, "New agreement"
+            1, user1Array, user2Array, CAN_SETTLE_EARLY, block.timestamp - 1 hours, "New agreement"
         );
     }
 
@@ -2531,8 +2544,8 @@ contract BetManagementEngineTest is Test {
         // Create initial bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -2545,15 +2558,17 @@ contract BetManagementEngineTest is Test {
         // Try to change to current timestamp
         vm.prank(maker);
         vm.expectRevert(BetManagementEngine.BetManagementEngine__EndTimeMustBeInTheFuture.selector);
-        betManagementEngine.changeBetParameters(1, user1, user2, CAN_SETTLE_EARLY, block.timestamp, "New agreement");
+        betManagementEngine.changeBetParameters(
+            1, user1Array, user2Array, CAN_SETTLE_EARLY, block.timestamp, "New agreement"
+        );
     }
 
     function testChangeBetParametersRevertsWithMakerAsTakerOrArbiter() public {
         // Create initial bet
         vm.prank(maker);
         betManagementEngine.createBet(
-            taker,
-            arbiter,
+            takerArray,
+            arbiterArray,
             address(mockToken),
             BET_AMOUNT,
             CAN_SETTLE_EARLY,
@@ -2568,8 +2583,8 @@ contract BetManagementEngineTest is Test {
         vm.expectRevert(BetManagementEngine.BetManagementEngine__TakerCannotBeArbiterOrMaker.selector);
         betManagementEngine.changeBetParameters(
             1,
-            maker, // maker as taker
-            user2,
+            makerArray, // maker as taker
+            user2Array,
             CAN_SETTLE_EARLY,
             block.timestamp + 2 days,
             "New agreement"
@@ -2580,8 +2595,8 @@ contract BetManagementEngineTest is Test {
         vm.expectRevert(BetManagementEngine.BetManagementEngine__TakerCannotBeArbiterOrMaker.selector);
         betManagementEngine.changeBetParameters(
             1,
-            user1,
-            maker, // maker as arbiter
+            user1Array,
+            makerArray, // maker as arbiter
             CAN_SETTLE_EARLY,
             block.timestamp + 2 days,
             "New agreement"

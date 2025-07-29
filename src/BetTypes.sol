@@ -33,8 +33,8 @@ library BetTypes {
 
     struct Bet {
         address maker;
-        address taker;
-        address arbiter;
+        address[] taker;
+        address[] arbiter;
         address betTokenAddress;
         uint256 betAmount;
         address takerBetTokenAddress;
